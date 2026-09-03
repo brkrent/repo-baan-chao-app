@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode, CreditCard,
+  Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode,
   Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
@@ -66,6 +66,7 @@ function Badge({ status }) {
   const meta = {
     awaiting_reading: { text: "รอกรอกมิเตอร์", bg: C.alertSoft, fg: C.alert },
     awaiting_payment: { text: "รอชำระเงิน", bg: C.electricSoft, fg: C.electric },
+    awaiting_confirmation: { text: "รอยืนยันการโอน", bg: C.alertSoft, fg: C.alert },
     paid: { text: "ชำระแล้ว", bg: C.successSoft, fg: C.success },
   }[status] || { text: status, bg: C.paper, fg: C.inkSoft };
   return <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: meta.bg, color: meta.fg }}>{meta.text}</span>;
@@ -86,7 +87,60 @@ function UsageBar({ icon: Icon, color, value, max, unit }) {
     </div>
   );
 }
-function HistoryPanel({ history }) {
+function ReceiptModal({ cycle, room, property, onClose }) {
+  const b = calcCycleBill(cycle);
+  const paidDate = cycle.paid_at
+    ? new Date(cycle.paid_at).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })
+    : "-";
+  return (
+    <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center print:static print:inset-auto" style={{ background: "rgba(22,38,59,0.5)" }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #receipt-print, #receipt-print * { visibility: visible; }
+          #receipt-print { position: absolute; top: 0; left: 0; width: 100%; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+      <div id="receipt-print" className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "#fff" }}>
+        <div className="no-print flex items-center justify-end mb-2">
+          <button onClick={onClose}><X size={18} color={C.inkSoft} /></button>
+        </div>
+
+        <div className="text-center mb-5">
+          {property?.logo_url && (
+            <img src={property.logo_url} alt="logo" className="w-10 h-10 rounded-lg object-cover mx-auto mb-2" />
+          )}
+          <div className="font-bold text-lg" style={{ color: C.navy, ...display }}>{property?.name || "ใบเสร็จรับเงิน"}</div>
+          <div className="text-xs" style={{ color: C.inkSoft }}>ใบเสร็จรับเงิน</div>
+        </div>
+
+        <div className="space-y-1.5 text-sm mb-4" style={{ color: C.inkSoft }}>
+          <div className="flex justify-between"><span>ห้อง</span><span style={{ color: C.ink }}>{room?.label}</span></div>
+          <div className="flex justify-between"><span>รอบบิล</span><span style={{ color: C.ink }}>{cycle.cycle_label}</span></div>
+          <div className="flex justify-between"><span>วันที่ชำระ</span><span style={{ color: C.ink }}>{paidDate}</span></div>
+        </div>
+
+        <div className="rounded-xl p-4 space-y-2 text-sm mb-4" style={{ background: C.paper }}>
+          <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
+          <Row label={`ค่าน้ำ (${b.waterUnits} หน่วย)`} value={`฿${baht(b.waterCost)}`} />
+          <Row label={`ค่าไฟ (${b.electricUnits} หน่วย)`} value={`฿${baht(b.electricCost)}`} />
+          <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: `1px dashed ${C.line}` }}>
+            <span className="font-semibold" style={{ color: C.navy }}>ยอดรวมที่ชำระ</span>
+            <span className="text-xl font-bold" style={mono}>฿{baht(b.total)}</span>
+          </div>
+        </div>
+
+        <button onClick={() => window.print()} className="no-print w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: C.navy }}>
+          พิมพ์ / บันทึกเป็น PDF
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HistoryPanel({ history, room, property }) {
+  const [selected, setSelected] = useState(null);
   const maxUsage = Math.max(1, ...history.flatMap((h) => [
     Math.max(0, h.curr_water - h.prev_water), Math.max(0, h.curr_electric - h.prev_electric),
   ]), 1);
@@ -101,24 +155,24 @@ function HistoryPanel({ history }) {
           {history.map((h) => {
             const b = calcCycleBill(h);
             return (
-              <div key={h.id} className="rounded-xl p-3" style={{ background: C.paper }}>
+              <button key={h.id} onClick={() => setSelected(h)} className="w-full text-left rounded-xl p-3" style={{ background: C.paper }}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold" style={{ color: C.navy }}>{h.cycle_label}</span>
                   <span className="text-sm font-bold" style={mono}>฿{baht(b.total)}</span>
                 </div>
                 <UsageBar icon={Droplet} color={C.water} value={b.waterUnits} max={maxUsage} unit="น้ำ" />
                 <UsageBar icon={Zap} color={C.electric} value={b.electricUnits} max={maxUsage} unit="ไฟ" />
-              </div>
+                <div className="text-[10px] mt-1.5" style={{ color: C.inkSoft }}>แตะเพื่อดูใบเสร็จ</div>
+              </button>
             );
           })}
         </div>
       )}
+      {selected && (
+        <ReceiptModal cycle={selected} room={room} property={property} onClose={() => setSelected(null)} />
+      )}
     </div>
   );
-}
-function TabBtn({ active, onClick, icon: Icon, text }) {
-  return (<button onClick={onClick} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium"
-    style={{ background: active ? C.navy : "#fff", color: active ? "#fff" : C.inkSoft }}><Icon size={15} /> {text}</button>);
 }
 function QRMock({ seed }) {
   const cells = React.useMemo(() => {
@@ -197,7 +251,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [rentDraft, setRentDraft] = useState("");
   const [photoDraft, setPhotoDraft] = useState("");
   const [rateDraft, setRateDraft] = useState({ water: rates?.water_rate || 18, electric: rates?.electric_rate || 8 });
-  const [propDraft, setPropDraft] = useState({ name: property?.name || "", logo_url: property?.logo_url || "" });
+  const [propDraft, setPropDraft] = useState({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "" });
   const [addForm, setAddForm] = useState({ label: "", tenantId: "", rent: "", prevWater: "0", prevElectric: "0" });
   const [addError, setAddError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -230,12 +284,17 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const saveRates = async () => {
     setBusy(true);
     await supabase.from("rates").update({ water_rate: Number(rateDraft.water), electric_rate: Number(rateDraft.electric) }).eq("id", 1);
-    await supabase.from("property_settings").update({ name: propDraft.name, logo_url: propDraft.logo_url }).eq("id", 1);
+    await supabase.from("property_settings").update({ name: propDraft.name, logo_url: propDraft.logo_url, payment_qr_url: propDraft.payment_qr_url }).eq("id", 1);
     setBusy(false); setShowSettings(false); onRefresh();
   };
   const markCashPaid = async () => {
     setBusy(true);
     await closeCycleAndAdvance(cycle, room, rates, "cash");
+    setBusy(false); setSelectedId(null); onRefresh();
+  };
+  const confirmTransfer = async () => {
+    setBusy(true);
+    await closeCycleAndAdvance(cycle, room, rates, "promptpay");
     setBusy(false); setSelectedId(null); onRefresh();
   };
   const createRoom = async () => {
@@ -267,7 +326,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
           <button onClick={() => setShowAddRoom(true)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white" style={{ background: C.navy }}>
             <Plus size={16} /> เพิ่มห้อง
           </button>
-          <button onClick={() => { setPropDraft({ name: property?.name || "", logo_url: property?.logo_url || "" }); setRateDraft({ water: rates?.water_rate, electric: rates?.electric_rate }); setShowSettings(true); }}
+          <button onClick={() => { setPropDraft({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "" }); setRateDraft({ water: rates?.water_rate, electric: rates?.electric_rate }); setShowSettings(true); }}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium" style={{ background: C.card, border: `1px solid ${C.line}`, color: C.navy }}>
             <Settings size={16} /> ตั้งค่า
           </button>
@@ -343,6 +402,16 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
             <input value={propDraft.name} onChange={(e) => setPropDraft({ ...propDraft, name: e.target.value })} className="w-full mt-1 mb-3 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} />
             <label className="text-xs font-medium" style={{ color: C.inkSoft }}>โลโก้ (ลิงก์รูปภาพ)</label>
             <input value={propDraft.logo_url} onChange={(e) => setPropDraft({ ...propDraft, logo_url: e.target.value })} placeholder="https://..." className="w-full mt-1 mb-3 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} />
+            <label className="text-xs font-medium" style={{ color: C.inkSoft }}>QR พร้อมเพย์จริง (ลิงก์รูปภาพ)</label>
+            <div className="flex items-center gap-2 mt-1 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden" style={{ background: C.paper, border: `1px solid ${C.line}` }}>
+                {propDraft.payment_qr_url ? <img src={propDraft.payment_qr_url} alt="QR" className="w-full h-full object-cover" /> : <QrCode size={16} color={C.inkSoft} />}
+              </div>
+              <input value={propDraft.payment_qr_url} onChange={(e) => setPropDraft({ ...propDraft, payment_qr_url: e.target.value })} placeholder="https://..." className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} />
+            </div>
+            <p className="text-[11px] -mt-2 mb-3" style={{ color: C.inkSoft }}>
+              อัปโหลดรูป QR พร้อมเพย์จริงของคุณ (จากแอปธนาคาร) ไว้ที่อื่นก่อน เช่น Imgur แล้ววางลิงก์รูปตรงนี้ ผู้เช่าจะสแกนแล้วโอนเงินเข้าบัญชีคุณโดยตรง
+            </p>
             <div className="h-px my-3" style={{ background: C.line }} />
             <p className="text-xs font-semibold mb-2" style={{ color: C.inkSoft }}>อัตราค่าน้ำไฟ (ทุกห้อง)</p>
             <label className="text-xs font-medium" style={{ color: C.inkSoft }}>ค่าน้ำ (บาท/หน่วย)</label>
@@ -399,7 +468,17 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 <Wallet size={16} /> {busy ? "กำลังบันทึก…" : "บันทึกว่าได้รับเงินสดแล้ว"}
               </button>
             )}
-            <HistoryPanel history={history} />
+            {cycle && cycle.status === "awaiting_confirmation" && (
+              <div className="mt-5">
+                <div className="rounded-xl p-3 mb-3 text-xs flex items-center gap-2" style={{ background: C.alertSoft, color: C.alert }}>
+                  <QrCode size={14} /> ผู้เช่าแจ้งว่าโอนเงินแล้ว — เช็คแอปธนาคารของคุณก่อนกดยืนยัน
+                </div>
+                <button onClick={confirmTransfer} disabled={busy} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: C.success }}>
+                  <Wallet size={16} /> {busy ? "กำลังบันทึก…" : "ยืนยันได้รับเงินแล้ว"}
+                </button>
+              </div>
+            )}
+            <HistoryPanel history={history} room={room} property={property} />
           </div>
         </div>
       )}
@@ -408,12 +487,10 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
 }
 
 // ---------- tenant ----------
-function TenantView({ room, cycle, rates, onRefresh }) {
+function TenantView({ room, cycle, rates, property, onRefresh }) {
   const [water, setWater] = useState(cycle ? cycle.prev_water : 0);
   const [electric, setElectric] = useState(cycle ? cycle.prev_electric : 0);
-  const [payTab, setPayTab] = useState("promptpay");
   const [processing, setProcessing] = useState(false);
-  const [card, setCard] = useState({ number: "", expiry: "", cvv: "" });
   const [history, setHistory] = useState([]);
 
   useEffect(() => {
@@ -431,11 +508,9 @@ function TenantView({ room, cycle, rates, onRefresh }) {
     setProcessing(false); onRefresh();
   };
 
-  const handlePay = async () => {
+  const notifyTransferred = async () => {
     setProcessing(true);
-    // จำลองการชำระเงิน (ยังไม่เชื่อมต่อ payment gateway จริง)
-    await new Promise((r) => setTimeout(r, 1200));
-    await closeCycleAndAdvance(cycle, room, rates, payTab === "promptpay" ? "promptpay" : "card");
+    await supabase.from("billing_cycles").update({ status: "awaiting_confirmation" }).eq("id", cycle.id);
     setProcessing(false); onRefresh();
   };
 
@@ -458,7 +533,7 @@ function TenantView({ room, cycle, rates, onRefresh }) {
           <button onClick={submitReading} disabled={processing} className="w-full mt-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
             {processing ? "กำลังส่ง…" : "ส่งค่ามิเตอร์"}
           </button>
-          <HistoryPanel history={history} />
+          <HistoryPanel history={history} room={room} property={property} />
         </div>
       )}
 
@@ -477,31 +552,37 @@ function TenantView({ room, cycle, rates, onRefresh }) {
             </div>
           </div>
           <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
-            <div className="flex rounded-xl overflow-hidden mb-4" style={{ border: `1px solid ${C.line}` }}>
-              <TabBtn active={payTab === "promptpay"} onClick={() => setPayTab("promptpay")} icon={QrCode} text="พร้อมเพย์" />
-              <TabBtn active={payTab === "card"} onClick={() => setPayTab("card")} icon={CreditCard} text="บัตรเครดิต" />
+            <h3 className="font-bold mb-3 flex items-center gap-2" style={{ color: C.navy, ...display }}><QrCode size={16} /> สแกนพร้อมเพย์เพื่อโอนเงิน</h3>
+            <div className="flex flex-col items-center">
+              {property?.payment_qr_url ? (
+                <img src={property.payment_qr_url} alt="พร้อมเพย์" className="w-44 h-44 object-contain rounded-xl" style={{ border: `1px solid ${C.line}` }} />
+              ) : (
+                <>
+                  <QRMock seed={room.id + bill.total} />
+                  <p className="text-[11px] mt-2 text-center" style={{ color: C.alert }}>เจ้าของบ้านยังไม่ได้อัปโหลด QR พร้อมเพย์จริง — นี่เป็นแค่ตัวอย่าง</p>
+                </>
+              )}
+              <p className="text-sm mt-3 font-medium" style={{ color: C.navy }}>ยอดโอน ฿{baht(bill.total)}</p>
+              <p className="text-[11px] mt-1 text-center" style={{ color: C.inkSoft }}>
+                สแกนแล้วโอนผ่านแอปธนาคารของคุณ จากนั้นกดปุ่มด้านล่างเพื่อแจ้งเจ้าของบ้าน
+              </p>
             </div>
-            {payTab === "promptpay" ? (
-              <div className="flex flex-col items-center">
-                <QRMock seed={room.id + bill.total} />
-                <p className="text-sm mt-3 font-medium" style={{ color: C.navy }}>ยอดชำระ ฿{baht(bill.total)}</p>
-                <p className="text-[11px] mt-1" style={{ color: C.inkSoft }}>ตัวอย่าง QR สำหรับทดสอบ — ยังไม่เชื่อมต่อธนาคารจริง</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div><label className="text-xs" style={{ color: C.inkSoft }}>หมายเลขบัตร</label>
-                  <input placeholder="0000 0000 0000 0000" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input placeholder="MM/YY" value={card.expiry} onChange={(e) => setCard({ ...card, expiry: e.target.value })} className="px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} />
-                  <input placeholder="CVV" value={card.cvv} onChange={(e) => setCard({ ...card, cvv: e.target.value })} className="px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} />
-                </div>
-              </div>
-            )}
-            <button onClick={handlePay} disabled={processing} className="w-full mt-5 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: processing ? C.navySoft : C.navy }}>
-              {processing ? "กำลังดำเนินการ…" : `ยืนยันชำระ ฿${baht(bill.total)}`}
+            <button onClick={notifyTransferred} disabled={processing} className="w-full mt-5 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: processing ? C.navySoft : C.navy }}>
+              {processing ? "กำลังส่ง…" : "แจ้งว่าโอนเงินแล้ว"}
             </button>
           </div>
-          <div className="rounded-2xl p-5 mt-4" style={{ background: C.card, border: `1px solid ${C.line}` }}><HistoryPanel history={history} /></div>
+          <div className="rounded-2xl p-5 mt-4" style={{ background: C.card, border: `1px solid ${C.line}` }}><HistoryPanel history={history} room={room} property={property} /></div>
+        </>
+      )}
+
+      {cycle.status === "awaiting_confirmation" && (
+        <>
+          <div className="rounded-2xl p-6 flex flex-col items-center text-center" style={{ background: C.alertSoft, border: `1px solid ${C.line}` }}>
+            <QrCode size={32} color={C.alert} />
+            <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>แจ้งโอนเงินแล้ว</h2>
+            <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอเจ้าของบ้านตรวจสอบและยืนยันยอด ฿{baht(bill.total)}</p>
+          </div>
+          <div className="rounded-2xl p-5 mt-4" style={{ background: C.card, border: `1px solid ${C.line}` }}><HistoryPanel history={history} room={room} property={property} /></div>
         </>
       )}
     </div>
@@ -596,7 +677,7 @@ export default function App() {
       {profile.role === "landlord" ? (
         <LandlordView rooms={rooms} cyclesByRoom={cyclesByRoom} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
       ) : (
-        <TenantView room={myRoom} cycle={myCycle} rates={rates} onRefresh={() => loadData(session.user.id)} />
+        <TenantView room={myRoom} cycle={myCycle} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
       )}
     </div>
   );
