@@ -262,8 +262,9 @@ function Spinner({ label }) {
 
 // ---------- login ----------
 function LoginScreen({ property }) {
-  const [userId, setUserId] = useState("");
+  const [userId, setUserId] = useState(() => localStorage.getItem("baanchao_last_id") || "");
   const [password, setPassword] = useState("");
+  const [rememberId, setRememberId] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -272,7 +273,9 @@ function LoginScreen({ property }) {
     setBusy(true); setError("");
     const { error } = await supabase.auth.signInWithPassword({ email: idToEmail(userId), password });
     setBusy(false);
-    if (error) setError("รหัส ID หรือรหัสผ่านไม่ถูกต้อง");
+    if (error) { setError("รหัส ID หรือรหัสผ่านไม่ถูกต้อง"); return; }
+    if (rememberId) localStorage.setItem("baanchao_last_id", userId.trim());
+    else localStorage.removeItem("baanchao_last_id");
   };
 
   return (
@@ -297,6 +300,10 @@ function LoginScreen({ property }) {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full text-sm outline-none" style={mono} placeholder="••••••••" />
           </div>
           {error && <p className="text-xs mt-2" style={{ color: C.alert }}>{error}</p>}
+          <label className="flex items-center gap-2 mt-3 text-xs" style={{ color: C.inkSoft }}>
+            <input type="checkbox" checked={rememberId} onChange={(e) => setRememberId(e.target.checked)} />
+            จดจำรหัส ID ไว้ในเครื่องนี้
+          </label>
           <button type="submit" disabled={busy} className="w-full mt-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
             {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
           </button>
