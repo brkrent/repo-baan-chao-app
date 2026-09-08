@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode,
-  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2,
+  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -74,6 +74,66 @@ function Badge({ status }) {
 function Row({ label, value }) {
   return (<div className="flex items-center justify-between"><span style={{ color: C.inkSoft }}>{label}</span><span style={mono}>{value}</span></div>);
 }
+function MeterCompare({ cycle }) {
+  return (
+    <div className="rounded-xl p-3 mb-3 space-y-1.5" style={{ background: C.paper }}>
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1" style={{ color: C.inkSoft }}><Droplet size={12} color={C.water} /> เลขมิเตอร์น้ำ (เก่า → ใหม่)</span>
+        <span style={mono}>{cycle.prev_water} → {cycle.curr_water ?? "-"}</span>
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1" style={{ color: C.inkSoft }}><Zap size={12} color={C.electric} /> เลขมิเตอร์ไฟ (เก่า → ใหม่)</span>
+        <span style={mono}>{cycle.prev_electric} → {cycle.curr_electric ?? "-"}</span>
+      </div>
+    </div>
+  );
+}
+function MeterPhoto({ path, label }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let active = true;
+    if (!path) { setUrl(null); return; }
+    supabase.storage.from("meter-photos").createSignedUrl(path, 3600).then(({ data }) => {
+      if (active && data) setUrl(data.signedUrl);
+    });
+    return () => { active = false; };
+  }, [path]);
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-[10px] mb-1" style={{ color: C.inkSoft }}>{label}</span>
+      {url ? (
+        <img src={url} alt={label} className="w-full h-24 object-cover rounded-lg" style={{ border: `1px solid ${C.line}` }} />
+      ) : (
+        <div className="w-full h-24 rounded-lg flex items-center justify-center" style={{ background: "#E4E1D4" }}>
+          <Loader2 size={16} className="animate-spin" color={C.inkSoft} />
+        </div>
+      )}
+    </div>
+  );
+}
+function MeterPhotos({ cycle }) {
+  if (!cycle.water_photo_path && !cycle.electric_photo_path) return null;
+  return (
+    <div className="grid grid-cols-2 gap-2 mb-3">
+      {cycle.water_photo_path && <MeterPhoto path={cycle.water_photo_path} label="รูปมิเตอร์น้ำ" />}
+      {cycle.electric_photo_path && <MeterPhoto path={cycle.electric_photo_path} label="รูปมิเตอร์ไฟ" />}
+    </div>
+  );
+}
+function PhotoPicker({ label, file, onChange }) {
+  const previewUrl = React.useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  return (
+    <label className="flex flex-col items-center justify-center gap-1 rounded-xl p-3 cursor-pointer" style={{ background: C.paper, border: `1px dashed ${C.line}` }}>
+      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
+      {previewUrl ? (
+        <img src={previewUrl} alt={label} className="w-full h-16 object-cover rounded-lg" />
+      ) : (
+        <Camera size={18} color={C.inkSoft} />
+      )}
+      <span className="text-[10px] text-center" style={{ color: C.inkSoft }}>{file ? "เปลี่ยนรูป" : label}</span>
+    </label>
+  );
+}
 function UsageBar({ icon: Icon, color, value, max, unit }) {
   const pct = Math.min(100, (value / max) * 100);
   return (
@@ -120,6 +180,9 @@ function ReceiptModal({ cycle, room, property, onClose }) {
           <div className="flex justify-between"><span>รอบบิล</span><span style={{ color: C.ink }}>{cycle.cycle_label}</span></div>
           <div className="flex justify-between"><span>วันที่ชำระ</span><span style={{ color: C.ink }}>{paidDate}</span></div>
         </div>
+
+        <MeterCompare cycle={cycle} />
+        <MeterPhotos cycle={cycle} />
 
         <div className="rounded-xl p-4 space-y-2 text-sm mb-4" style={{ background: C.paper }}>
           <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
@@ -454,6 +517,8 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
               <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ผู้เช่ายังไม่ได้กรอกมิเตอร์น้ำไฟของรอบนี้</div>
             ) : (
               <div className="space-y-2 text-sm">
+                <MeterCompare cycle={cycle} />
+                <MeterPhotos cycle={cycle} />
                 <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
                 <Row label={`ค่าน้ำ (${bill.waterUnits} หน่วย)`} value={`฿${baht(bill.waterCost)}`} />
                 <Row label={`ค่าไฟ (${bill.electricUnits} หน่วย)`} value={`฿${baht(bill.electricCost)}`} />
@@ -490,6 +555,8 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
 function TenantView({ room, cycle, rates, property, onRefresh }) {
   const [water, setWater] = useState(cycle ? cycle.prev_water : 0);
   const [electric, setElectric] = useState(cycle ? cycle.prev_electric : 0);
+  const [waterPhoto, setWaterPhoto] = useState(null);
+  const [electricPhoto, setElectricPhoto] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [history, setHistory] = useState([]);
 
@@ -504,7 +571,19 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 
   const submitReading = async () => {
     setProcessing(true);
-    await supabase.from("billing_cycles").update({ curr_water: Number(water), curr_electric: Number(electric), status: "awaiting_payment", submitted_at: new Date().toISOString() }).eq("id", cycle.id);
+    const updates = { curr_water: Number(water), curr_electric: Number(electric), status: "awaiting_payment", submitted_at: new Date().toISOString() };
+    if (waterPhoto) {
+      const path = `${room.id}/${cycle.id}-water-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("meter-photos").upload(path, waterPhoto, { upsert: true });
+      if (!error) updates.water_photo_path = path;
+    }
+    if (electricPhoto) {
+      const path = `${room.id}/${cycle.id}-electric-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("meter-photos").upload(path, electricPhoto, { upsert: true });
+      if (!error) updates.electric_photo_path = path;
+    }
+    await supabase.from("billing_cycles").update(updates).eq("id", cycle.id);
+    await rotateOldPhotos(room.id);
     setProcessing(false); onRefresh();
   };
 
@@ -530,7 +609,12 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
             <div><label className="text-xs" style={{ color: C.inkSoft }}>เลขมิเตอร์ไฟปัจจุบัน</label>
               <input type="number" value={electric} onChange={(e) => setElectric(Number(e.target.value))} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} /></div>
           </div>
-          <button onClick={submitReading} disabled={processing} className="w-full mt-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <PhotoPicker label="ถ่ายรูปมิเตอร์น้ำ" file={waterPhoto} onChange={setWaterPhoto} />
+            <PhotoPicker label="ถ่ายรูปมิเตอร์ไฟ" file={electricPhoto} onChange={setElectricPhoto} />
+          </div>
+          <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 3 เดือนล่าสุด รูปเก่ากว่านั้นจะถูกลบอัตโนมัติ (ตัวเลขมิเตอร์ยังเก็บถาวร)</p>
+          <button onClick={submitReading} disabled={processing} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
             {processing ? "กำลังส่ง…" : "ส่งค่ามิเตอร์"}
           </button>
           <HistoryPanel history={history} room={room} property={property} />
@@ -541,6 +625,8 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
         <>
           <div className="rounded-2xl p-5 mb-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
             <h2 className="font-bold mb-3" style={{ color: C.navy, ...display }}>บิลรอบนี้ — {room.label} ({cycle.cycle_label})</h2>
+            <MeterCompare cycle={cycle} />
+            <MeterPhotos cycle={cycle} />
             <div className="space-y-2 text-sm">
               <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
               <Row label={`ค่าน้ำ (${bill.waterUnits} หน่วย)`} value={`฿${baht(bill.waterCost)}`} />
@@ -590,6 +676,26 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 }
 
 // ---------- shared: close a cycle, record payment, open the next one ----------
+// ---------- keep only the 3 most recent meter photos per room ----------
+async function rotateOldPhotos(roomId) {
+  const { data: cycles } = await supabase.from("billing_cycles")
+    .select("id, water_photo_path, electric_photo_path")
+    .eq("room_id", roomId)
+    .or("water_photo_path.not.is.null,electric_photo_path.not.is.null")
+    .order("created_at", { ascending: false });
+  if (!cycles || cycles.length <= 3) return;
+  const toClear = cycles.slice(3);
+  const paths = [];
+  toClear.forEach((c) => {
+    if (c.water_photo_path) paths.push(c.water_photo_path);
+    if (c.electric_photo_path) paths.push(c.electric_photo_path);
+  });
+  if (paths.length) await supabase.storage.from("meter-photos").remove(paths);
+  await Promise.all(toClear.map((c) =>
+    supabase.from("billing_cycles").update({ water_photo_path: null, electric_photo_path: null }).eq("id", c.id)
+  ));
+}
+
 async function closeCycleAndAdvance(cycle, room, rates, method) {
   const bill = calcCycleBill(cycle);
   await supabase.from("billing_cycles").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", cycle.id);
