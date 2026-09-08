@@ -557,6 +557,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
   const [electric, setElectric] = useState(cycle ? cycle.prev_electric : 0);
   const [waterPhoto, setWaterPhoto] = useState(null);
   const [electricPhoto, setElectricPhoto] = useState(null);
+  const [photoError, setPhotoError] = useState("");
   const [processing, setProcessing] = useState(false);
   const [history, setHistory] = useState([]);
 
@@ -571,16 +572,19 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 
   const submitReading = async () => {
     setProcessing(true);
+    setPhotoError("");
     const updates = { curr_water: Number(water), curr_electric: Number(electric), status: "awaiting_payment", submitted_at: new Date().toISOString() };
     if (waterPhoto) {
       const path = `${room.id}/${cycle.id}-water-${Date.now()}.jpg`;
       const { error } = await supabase.storage.from("meter-photos").upload(path, waterPhoto, { upsert: true });
-      if (!error) updates.water_photo_path = path;
+      if (error) setPhotoError(`อัปโหลดรูปน้ำไม่สำเร็จ: ${error.message}`);
+      else updates.water_photo_path = path;
     }
     if (electricPhoto) {
       const path = `${room.id}/${cycle.id}-electric-${Date.now()}.jpg`;
       const { error } = await supabase.storage.from("meter-photos").upload(path, electricPhoto, { upsert: true });
-      if (!error) updates.electric_photo_path = path;
+      if (error) setPhotoError((prev) => prev ? `${prev} / อัปโหลดรูปไฟไม่สำเร็จ: ${error.message}` : `อัปโหลดรูปไฟไม่สำเร็จ: ${error.message}`);
+      else updates.electric_photo_path = path;
     }
     await supabase.from("billing_cycles").update(updates).eq("id", cycle.id);
     await rotateOldPhotos(room.id);
@@ -614,6 +618,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
             <PhotoPicker label="ถ่ายรูปมิเตอร์ไฟ" file={electricPhoto} onChange={setElectricPhoto} />
           </div>
           <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 3 เดือนล่าสุด รูปเก่ากว่านั้นจะถูกลบอัตโนมัติ (ตัวเลขมิเตอร์ยังเก็บถาวร)</p>
+          {photoError && <p className="text-xs mt-2 rounded-lg p-2" style={{ background: C.alertSoft, color: C.alert }}>{photoError}</p>}
           <button onClick={submitReading} disabled={processing} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
             {processing ? "กำลังส่ง…" : "ส่งค่ามิเตอร์"}
           </button>
