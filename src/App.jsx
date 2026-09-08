@@ -124,7 +124,7 @@ function PhotoPicker({ label, file, onChange }) {
   const previewUrl = React.useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
   return (
     <label className="flex flex-col items-center justify-center gap-1 rounded-xl p-3 cursor-pointer" style={{ background: C.paper, border: `1px dashed ${C.line}` }}>
-      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
+      <input type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
       {previewUrl ? (
         <img src={previewUrl} alt={label} className="w-full h-16 object-cover rounded-lg" />
       ) : (
