@@ -123,14 +123,18 @@ function MeterPhotos({ cycle }) {
 function PhotoPicker({ label, file, onChange }) {
   const previewUrl = React.useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
   return (
-    <label className="flex flex-col items-center justify-center gap-1 rounded-xl p-3 cursor-pointer" style={{ background: C.paper, border: `1px dashed ${C.line}` }}>
+    <label className="flex flex-col items-center justify-center gap-1 rounded-xl p-3 cursor-pointer" style={{ background: file ? C.successSoft : C.paper, border: `1px dashed ${file ? C.success : C.line}` }}>
       <input type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
       {previewUrl ? (
         <img src={previewUrl} alt={label} className="w-full h-16 object-cover rounded-lg" />
       ) : (
         <Camera size={18} color={C.inkSoft} />
       )}
-      <span className="text-[10px] text-center" style={{ color: C.inkSoft }}>{file ? "เปลี่ยนรูป" : label}</span>
+      {file ? (
+        <span className="text-[10px] text-center font-semibold" style={{ color: C.success }}>✓ เลือกแล้ว: {file.name} ({Math.round(file.size / 1024)} KB)</span>
+      ) : (
+        <span className="text-[10px] text-center" style={{ color: C.inkSoft }}>{label}</span>
+      )}
     </label>
   );
 }
