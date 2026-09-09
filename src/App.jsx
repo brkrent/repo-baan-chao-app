@@ -34,6 +34,10 @@ function calcCycleBill(cycle) {
   const electricCost = electricUnits * cycle.electric_rate;
   return { waterUnits, electricUnits, waterCost, electricCost, total: Number(cycle.rent) + waterCost + electricCost };
 }
+function daysSince(dateStr) {
+  if (!dateStr) return 0;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+}
 
 // ---------- small presentational pieces ----------
 function Gauge({ value, max, color, softColor, icon: Icon, label, unitLabel }) {
@@ -259,6 +263,14 @@ function Spinner({ label }) {
   return (<div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: C.inkSoft }}>
     <Loader2 size={22} className="animate-spin" /><span className="text-xs">{label}</span></div>);
 }
+function OverdueBanner({ days }) {
+  if (days < 3) return null;
+  return (
+    <div className="rounded-xl p-3 mb-4 flex items-center gap-2 text-sm font-medium" style={{ background: C.alertSoft, color: C.alert }}>
+      <History size={16} /> ค้างชำระมาแล้ว {days} วัน กรุณาชำระโดยเร็ว
+    </div>
+  );
+}
 
 // ---------- login ----------
 function LoginScreen({ property }) {
@@ -418,7 +430,12 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
               )}
               <div className="px-4 flex items-center justify-between">
                 <span className="font-bold" style={{ color: C.navy, ...display }}>{r.label}</span>
-                {c && <Badge status={c.status} />}
+                <div className="flex flex-col items-end gap-1">
+                  {c && <Badge status={c.status} />}
+                  {c && c.status === "awaiting_payment" && daysSince(c.submitted_at) >= 3 && (
+                    <span className="text-[10px] font-semibold" style={{ color: C.alert }}>ค้างชำระ {daysSince(c.submitted_at)} วัน</span>
+                  )}
+                </div>
               </div>
               <div className="px-4 flex items-center gap-4 text-xs" style={{ color: C.inkSoft }}>
                 <span className="flex items-center gap-1"><Droplet size={13} color={C.water} />{b ? b.waterUnits : "—"} หน่วย</span>
@@ -639,6 +656,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 
       {cycle.status === "awaiting_payment" && (
         <>
+          <OverdueBanner days={daysSince(cycle.submitted_at)} />
           <div className="rounded-2xl p-5 mb-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
             <h2 className="font-bold mb-3" style={{ color: C.navy, ...display }}>บิลรอบนี้ — {room.label} ({cycle.cycle_label})</h2>
             <MeterCompare cycle={cycle} />
