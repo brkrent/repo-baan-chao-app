@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode,
-  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera,
+  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -742,6 +742,305 @@ async function closeCycleAndAdvance(cycle, room, rates, method) {
 }
 
 // ---------- app root ----------
+// ---------- shop: landlord ----------
+function ShopLandlordView() {
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [tab, setTab] = useState("orders");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", price: "", photo: "" });
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data: p } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+    setProducts(p || []);
+    const { data: o } = await supabase.from("shop_orders").select("*, shop_order_items(*), rooms(label)").order("created_at", { ascending: false });
+    setOrders(o || []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const addProduct = async () => {
+    if (!form.name.trim() || !Number(form.price)) return;
+    setBusy(true);
+    await supabase.from("products").insert({ name: form.name.trim(), price: Number(form.price), photo: form.photo || null });
+    setBusy(false); setShowAdd(false); setForm({ name: "", price: "", photo: "" }); load();
+  };
+  const toggleActive = async (p) => {
+    await supabase.from("products").update({ active: !p.active }).eq("id", p.id);
+    load();
+  };
+  const removeProduct = async (p) => {
+    await supabase.from("products").delete().eq("id", p.id);
+    load();
+  };
+  const confirmOrder = async (order) => {
+    setBusy(true);
+    await supabase.from("shop_orders").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", order.id);
+    setBusy(false); load();
+  };
+  const markCashPaid = async (order) => {
+    setBusy(true);
+    await supabase.from("shop_orders").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", order.id);
+    setBusy(false); load();
+  };
+
+  const pendingOrders = orders.filter((o) => o.status !== "paid");
+  const paidOrders = orders.filter((o) => o.status === "paid").slice(0, 20);
+
+  return (
+    <div className="p-5 md:p-8 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-bold" style={{ color: C.navy, ...display }}>ร้านค้า</h1>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white" style={{ background: C.navy }}>
+          <Plus size={16} /> เพิ่มสินค้า
+        </button>
+      </div>
+
+      <div className="flex rounded-xl overflow-hidden mb-4" style={{ border: `1px solid ${C.line}` }}>
+        <button onClick={() => setTab("orders")} className="flex-1 py-2.5 text-sm font-medium" style={{ background: tab === "orders" ? C.navy : "#fff", color: tab === "orders" ? "#fff" : C.inkSoft }}>คำสั่งซื้อ</button>
+        <button onClick={() => setTab("products")} className="flex-1 py-2.5 text-sm font-medium" style={{ background: tab === "products" ? C.navy : "#fff", color: tab === "products" ? "#fff" : C.inkSoft }}>จัดการสินค้า</button>
+      </div>
+
+      {tab === "products" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {products.length === 0 && <p className="text-sm col-span-2" style={{ color: C.inkSoft }}>ยังไม่มีสินค้า กด "เพิ่มสินค้า" เพื่อเริ่มต้น</p>}
+          {products.map((p) => (
+            <div key={p.id} className="rounded-2xl p-3 flex items-center gap-3" style={{ background: C.card, border: `1px solid ${C.line}`, opacity: p.active ? 1 : 0.5 }}>
+              <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: C.paper }}>
+                {p.photo ? <img src={p.photo} alt={p.name} className="w-full h-full object-cover" /> : <ShoppingCart size={18} color={C.inkSoft} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm truncate" style={{ color: C.navy }}>{p.name}</div>
+                <div className="text-sm" style={mono}>฿{baht(p.price)}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button onClick={() => toggleActive(p)} className="text-[10px] px-2 py-1 rounded-full font-semibold" style={{ background: p.active ? C.successSoft : C.paper, color: p.active ? C.success : C.inkSoft }}>
+                  {p.active ? "กำลังขาย" : "ปิดขาย"}
+                </button>
+                <button onClick={() => removeProduct(p)} className="text-[10px] px-2 py-1 rounded-full font-semibold flex items-center justify-center gap-1" style={{ background: C.alertSoft, color: C.alert }}>
+                  <Trash2 size={10} /> ลบ
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "orders" && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold mb-2" style={{ color: C.inkSoft }}>รอดำเนินการ</p>
+            {pendingOrders.length === 0 && <p className="text-sm" style={{ color: C.inkSoft }}>ไม่มีคำสั่งซื้อค้างอยู่</p>}
+            <div className="space-y-3">
+              {pendingOrders.map((o) => (
+                <div key={o.id} className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm" style={{ color: C.navy }}>{o.rooms?.label || "ห้อง"}</span>
+                    <Badge status={o.status === "awaiting_confirmation" ? "awaiting_confirmation" : "awaiting_payment"} />
+                  </div>
+                  <div className="space-y-1 text-xs mb-2" style={{ color: C.inkSoft }}>
+                    {(o.shop_order_items || []).map((it) => (
+                      <div key={it.id} className="flex justify-between"><span>{it.product_name} × {it.quantity}</span><span style={mono}>฿{baht(it.subtotal)}</span></div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between pt-2" style={{ borderTop: `1px dashed ${C.line}` }}>
+                    <span className="text-xs font-semibold" style={{ color: C.navy }}>รวม</span>
+                    <span className="font-bold" style={mono}>฿{baht(o.total)}</span>
+                  </div>
+                  {o.status === "awaiting_confirmation" ? (
+                    <button onClick={() => confirmOrder(o)} disabled={busy} className="w-full mt-3 py-2 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-2" style={{ background: C.success }}>
+                      <Wallet size={14} /> ยืนยันได้รับเงินแล้ว
+                    </button>
+                  ) : (
+                    <button onClick={() => markCashPaid(o)} disabled={busy} className="w-full mt-3 py-2 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-2" style={{ background: C.success }}>
+                      <Wallet size={14} /> บันทึกว่าได้รับเงินสดแล้ว
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold mb-2" style={{ color: C.inkSoft }}>ประวัติ (ชำระแล้ว)</p>
+            {paidOrders.length === 0 && <p className="text-sm" style={{ color: C.inkSoft }}>ยังไม่มีประวัติ</p>}
+            <div className="space-y-2">
+              {paidOrders.map((o) => (
+                <div key={o.id} className="rounded-xl p-3 flex items-center justify-between text-sm" style={{ background: C.paper }}>
+                  <span style={{ color: C.navy }}>{o.rooms?.label} — {new Date(o.paid_at).toLocaleDateString("th-TH")}</span>
+                  <span className="font-semibold" style={mono}>฿{baht(o.total)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="fixed inset-0 z-20 flex items-end sm:items-center justify-center" style={{ background: "rgba(22,38,59,0.45)" }}>
+          <div className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5" style={{ background: C.card }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold" style={{ color: C.navy, ...display }}>เพิ่มสินค้าใหม่</h3>
+              <button onClick={() => setShowAdd(false)}><X size={18} color={C.inkSoft} /></button>
+            </div>
+            <div className="space-y-3">
+              <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>ชื่อสินค้า</label>
+                <input placeholder="เช่น น้ำดื่มถังใหญ่" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} /></div>
+              <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>ราคา (บาท)</label>
+                <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} /></div>
+              <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>รูปภาพ (ลิงก์รูปภาพ ไม่บังคับ)</label>
+                <input placeholder="https://..." value={form.photo} onChange={(e) => setForm({ ...form, photo: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} /></div>
+              <button onClick={addProduct} disabled={busy} className="w-full mt-2 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+                {busy ? "กำลังเพิ่ม…" : "เพิ่มสินค้า"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- shop: tenant ----------
+function ShopTenantView({ room, property }) {
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState({});
+  const [openOrder, setOpenOrder] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [processing, setProcessing] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!room) return;
+    const { data: p } = await supabase.from("products").select("*").eq("active", true).order("created_at", { ascending: false });
+    setProducts(p || []);
+    const { data: open } = await supabase.from("shop_orders").select("*, shop_order_items(*)").eq("room_id", room.id).neq("status", "paid").order("created_at", { ascending: false }).maybeSingle();
+    setOpenOrder(open || null);
+    const { data: paid } = await supabase.from("shop_orders").select("*, shop_order_items(*)").eq("room_id", room.id).eq("status", "paid").order("created_at", { ascending: false }).limit(10);
+    setHistory(paid || []);
+  }, [room]);
+  useEffect(() => { load(); }, [load]);
+
+  if (!room) return <Spinner label="กำลังโหลดข้อมูลห้อง…" />;
+
+  const cartItems = products.filter((p) => cart[p.id] > 0).map((p) => ({ ...p, qty: cart[p.id] }));
+  const cartTotal = cartItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+
+  const setQty = (id, qty) => setCart((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+
+  const checkout = async () => {
+    if (cartItems.length === 0) return;
+    setProcessing(true);
+    const { data: order } = await supabase.from("shop_orders").insert({ room_id: room.id, status: "awaiting_payment", total: cartTotal }).select().single();
+    if (order) {
+      await supabase.from("shop_order_items").insert(cartItems.map((it) => ({ order_id: order.id, product_name: it.name, unit_price: it.price, quantity: it.qty, subtotal: it.price * it.qty })));
+    }
+    setCart({}); setProcessing(false); load();
+  };
+
+  const notifyTransferred = async () => {
+    setProcessing(true);
+    await supabase.from("shop_orders").update({ status: "awaiting_confirmation" }).eq("id", openOrder.id);
+    setProcessing(false); load();
+  };
+
+  if (openOrder) {
+    return (
+      <div className="p-5 md:p-8 max-w-lg mx-auto">
+        {openOrder.status === "awaiting_payment" ? (
+          <>
+            <div className="rounded-2xl p-5 mb-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+              <h2 className="font-bold mb-3" style={{ color: C.navy, ...display }}>คำสั่งซื้อของคุณ</h2>
+              <div className="space-y-2 text-sm mb-3">
+                {(openOrder.shop_order_items || []).map((it) => (
+                  <Row key={it.id} label={`${it.product_name} × ${it.quantity}`} value={`฿${baht(it.subtotal)}`} />
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
+                <span className="font-semibold" style={{ color: C.navy }}>ยอดที่ต้องชำระ</span>
+                <span className="text-2xl font-bold" style={mono}>฿{baht(openOrder.total)}</span>
+              </div>
+            </div>
+            <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+              <h3 className="font-bold mb-3 flex items-center gap-2" style={{ color: C.navy, ...display }}><QrCode size={16} /> สแกนพร้อมเพย์เพื่อโอนเงิน</h3>
+              <div className="flex flex-col items-center">
+                {property?.payment_qr_url ? (
+                  <img src={property.payment_qr_url} alt="พร้อมเพย์" className="w-44 h-44 object-contain rounded-xl" style={{ border: `1px solid ${C.line}` }} />
+                ) : (
+                  <QRMock seed={openOrder.id} />
+                )}
+                <p className="text-sm mt-3 font-medium" style={{ color: C.navy }}>ยอดโอน ฿{baht(openOrder.total)}</p>
+              </div>
+              <button onClick={notifyTransferred} disabled={processing} className="w-full mt-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+                {processing ? "กำลังส่ง…" : "แจ้งว่าโอนเงินแล้ว"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-2xl p-6 flex flex-col items-center text-center" style={{ background: C.alertSoft, border: `1px solid ${C.line}` }}>
+            <QrCode size={32} color={C.alert} />
+            <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>แจ้งโอนเงินแล้ว</h2>
+            <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอเจ้าของบ้านตรวจสอบและยืนยันยอด ฿{baht(openOrder.total)}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5 md:p-8 max-w-lg mx-auto">
+      <h1 className="text-xl font-bold mb-4" style={{ color: C.navy, ...display }}>ร้านค้า</h1>
+      {products.length === 0 ? (
+        <p className="text-sm" style={{ color: C.inkSoft }}>ยังไม่มีสินค้าวางขายตอนนี้</p>
+      ) : (
+        <div className="space-y-3 mb-6">
+          {products.map((p) => (
+            <div key={p.id} className="rounded-2xl p-3 flex items-center gap-3" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+              <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: C.paper }}>
+                {p.photo ? <img src={p.photo} alt={p.name} className="w-full h-full object-cover" /> : <ShoppingCart size={18} color={C.inkSoft} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm truncate" style={{ color: C.navy }}>{p.name}</div>
+                <div className="text-sm" style={mono}>฿{baht(p.price)}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setQty(p.id, (cart[p.id] || 0) - 1)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: C.paper }}><Minus size={14} /></button>
+                <span className="w-5 text-center text-sm" style={mono}>{cart[p.id] || 0}</span>
+                <button onClick={() => setQty(p.id, (cart[p.id] || 0) + 1)} className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{ background: C.navy }}><Plus size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {cartItems.length > 0 && (
+        <div className="rounded-2xl p-4 mb-6" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-semibold text-sm" style={{ color: C.navy }}>รวม {cartItems.reduce((s, it) => s + it.qty, 0)} ชิ้น</span>
+            <span className="text-xl font-bold" style={mono}>฿{baht(cartTotal)}</span>
+          </div>
+          <button onClick={checkout} disabled={processing} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+            {processing ? "กำลังสั่งซื้อ…" : "สั่งซื้อ"}
+          </button>
+        </div>
+      )}
+      {history.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-2" style={{ color: C.inkSoft }}>ประวัติการสั่งซื้อ</p>
+          <div className="space-y-2">
+            {history.map((o) => (
+              <div key={o.id} className="rounded-xl p-3" style={{ background: C.paper }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs" style={{ color: C.inkSoft }}>{new Date(o.paid_at).toLocaleDateString("th-TH")}</span>
+                  <span className="text-sm font-bold" style={mono}>฿{baht(o.total)}</span>
+                </div>
+                <div className="text-xs" style={{ color: C.inkSoft }}>{(o.shop_order_items || []).map((it) => `${it.product_name} ×${it.quantity}`).join(", ")}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
   const [profile, setProfile] = useState(null);
@@ -750,6 +1049,7 @@ export default function App() {
   const [rooms, setRooms] = useState([]);
   const [cyclesByRoom, setCyclesByRoom] = useState({});
   const [loadingData, setLoadingData] = useState(true);
+  const [view, setView] = useState("bills");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -814,10 +1114,21 @@ export default function App() {
         </div>
       </div>
 
-      {profile.role === "landlord" ? (
-        <LandlordView rooms={rooms} cyclesByRoom={cyclesByRoom} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+      <div className="flex justify-center gap-2 py-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}` }}>
+        <button onClick={() => setView("bills")} className="px-4 py-1.5 rounded-full text-xs font-semibold" style={{ background: view === "bills" ? C.navy : C.paper, color: view === "bills" ? "#fff" : C.inkSoft }}>บิล</button>
+        <button onClick={() => setView("shop")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "shop" ? C.navy : C.paper, color: view === "shop" ? "#fff" : C.inkSoft }}><ShoppingCart size={13} /> ร้านค้า</button>
+      </div>
+
+      {view === "bills" ? (
+        profile.role === "landlord" ? (
+          <LandlordView rooms={rooms} cyclesByRoom={cyclesByRoom} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+        ) : (
+          <TenantView room={myRoom} cycle={myCycle} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+        )
+      ) : profile.role === "landlord" ? (
+        <ShopLandlordView />
       ) : (
-        <TenantView room={myRoom} cycle={myCycle} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+        <ShopTenantView room={myRoom} property={property} />
       )}
     </div>
   );
