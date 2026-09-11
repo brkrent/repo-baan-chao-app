@@ -304,7 +304,7 @@ function LoginScreen({ property }) {
           <label className="text-xs font-medium" style={{ color: C.inkSoft }}>รหัสผู้ใช้ (ID)</label>
           <div className="flex items-center gap-2 mt-1 mb-3 px-3 py-2 rounded-xl" style={{ border: `1px solid ${C.line}` }}>
             <Mail size={15} color={C.inkSoft} />
-            <input value={userId} onChange={(e) => setUserId(e.target.value)} className="w-full text-sm outline-none" style={mono} placeholder="เช่น landlord หรือ 1a" />
+            <input value={userId} onChange={(e) => setUserId(e.target.value)} className="w-full text-sm outline-none" style={mono} />
           </div>
           <label className="text-xs font-medium" style={{ color: C.inkSoft }}>รหัสผ่าน</label>
           <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-xl" style={{ border: `1px solid ${C.line}` }}>
