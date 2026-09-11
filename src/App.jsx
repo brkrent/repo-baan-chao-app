@@ -748,7 +748,7 @@ function ShopLandlordView() {
   const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("orders");
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", price: "", photo: "" });
+  const [form, setForm] = useState({ name: "", price: "", photo: "", description: "" });
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -762,8 +762,8 @@ function ShopLandlordView() {
   const addProduct = async () => {
     if (!form.name.trim() || !Number(form.price)) return;
     setBusy(true);
-    await supabase.from("products").insert({ name: form.name.trim(), price: Number(form.price), photo: form.photo || null });
-    setBusy(false); setShowAdd(false); setForm({ name: "", price: "", photo: "" }); load();
+    await supabase.from("products").insert({ name: form.name.trim(), price: Number(form.price), photo: form.photo || null, description: form.description.trim() || null });
+    setBusy(false); setShowAdd(false); setForm({ name: "", price: "", photo: "", description: "" }); load();
   };
   const toggleActive = async (p) => {
     await supabase.from("products").update({ active: !p.active }).eq("id", p.id);
@@ -805,15 +805,16 @@ function ShopLandlordView() {
         <div className="grid gap-3 sm:grid-cols-2">
           {products.length === 0 && <p className="text-sm col-span-2" style={{ color: C.inkSoft }}>ยังไม่มีสินค้า กด "เพิ่มสินค้า" เพื่อเริ่มต้น</p>}
           {products.map((p) => (
-            <div key={p.id} className="rounded-2xl p-3 flex items-center gap-3" style={{ background: C.card, border: `1px solid ${C.line}`, opacity: p.active ? 1 : 0.5 }}>
+            <div key={p.id} className="rounded-2xl p-3 flex items-start gap-3" style={{ background: C.card, border: `1px solid ${C.line}`, opacity: p.active ? 1 : 0.5 }}>
               <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: C.paper }}>
                 {p.photo ? <img src={p.photo} alt={p.name} className="w-full h-full object-cover" /> : <ShoppingCart size={18} color={C.inkSoft} />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm truncate" style={{ color: C.navy }}>{p.name}</div>
-                <div className="text-sm" style={mono}>฿{baht(p.price)}</div>
+                <div className="font-semibold text-sm break-words" style={{ color: C.navy }}>{p.name}</div>
+                {p.description && <div className="text-xs mt-0.5 break-words" style={{ color: C.inkSoft }}>{p.description}</div>}
+                <div className="text-sm mt-0.5" style={mono}>฿{baht(p.price)}</div>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 shrink-0">
                 <button onClick={() => toggleActive(p)} className="text-[10px] px-2 py-1 rounded-full font-semibold" style={{ background: p.active ? C.successSoft : C.paper, color: p.active ? C.success : C.inkSoft }}>
                   {p.active ? "กำลังขาย" : "ปิดขาย"}
                 </button>
@@ -885,6 +886,8 @@ function ShopLandlordView() {
             <div className="space-y-3">
               <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>ชื่อสินค้า</label>
                 <input placeholder="เช่น น้ำดื่มถังใหญ่" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} /></div>
+              <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>คำอธิบาย (ไม่บังคับ)</label>
+                <textarea placeholder="เช่น ขนาด 600 มล. แพ็ค 6 ขวด" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none resize-none" style={{ border: `1px solid ${C.line}` }} /></div>
               <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>ราคา (บาท)</label>
                 <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} /></div>
               <div><label className="text-xs font-medium" style={{ color: C.inkSoft }}>รูปภาพ (ลิงก์รูปภาพ ไม่บังคับ)</label>
@@ -993,15 +996,16 @@ function ShopTenantView({ room, property }) {
       ) : (
         <div className="space-y-3 mb-6">
           {products.map((p) => (
-            <div key={p.id} className="rounded-2xl p-3 flex items-center gap-3" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+            <div key={p.id} className="rounded-2xl p-3 flex items-start gap-3" style={{ background: C.card, border: `1px solid ${C.line}` }}>
               <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: C.paper }}>
                 {p.photo ? <img src={p.photo} alt={p.name} className="w-full h-full object-cover" /> : <ShoppingCart size={18} color={C.inkSoft} />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm truncate" style={{ color: C.navy }}>{p.name}</div>
-                <div className="text-sm" style={mono}>฿{baht(p.price)}</div>
+                <div className="font-semibold text-sm break-words" style={{ color: C.navy }}>{p.name}</div>
+                {p.description && <div className="text-xs mt-0.5 break-words" style={{ color: C.inkSoft }}>{p.description}</div>}
+                <div className="text-sm mt-0.5" style={mono}>฿{baht(p.price)}</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => setQty(p.id, (cart[p.id] || 0) - 1)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: C.paper }}><Minus size={14} /></button>
                 <span className="w-5 text-center text-sm" style={mono}>{cart[p.id] || 0}</span>
                 <button onClick={() => setQty(p.id, (cart[p.id] || 0) + 1)} className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{ background: C.navy }}><Plus size={14} /></button>
