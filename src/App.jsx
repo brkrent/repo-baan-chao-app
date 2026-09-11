@@ -340,6 +340,9 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [propDraft, setPropDraft] = useState({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "" });
   const [addForm, setAddForm] = useState({ label: "", tenantId: "", rent: "", prevWater: "0", prevElectric: "0" });
   const [addError, setAddError] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [passwordMsg, setPasswordMsg] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const room = rooms.find((r) => r.id === selectedId);
@@ -350,6 +353,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setSelectedId(r.id);
     setRentDraft(r.rent);
     setPhotoDraft(r.photo || "");
+    setPasswordDraft(""); setPasswordMsg(""); setPasswordError("");
     const { data } = await supabase.from("billing_cycles").select("*").eq("room_id", r.id).eq("status", "paid").order("created_at", { ascending: false });
     setHistory(data || []);
   };
@@ -366,6 +370,17 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setBusy(true);
     await supabase.from("rooms").update({ photo: photoDraft }).eq("id", room.id);
     setBusy(false); onRefresh();
+  };
+  const changeTenantPassword = async () => {
+    setPasswordError(""); setPasswordMsg("");
+    if (!passwordDraft || passwordDraft.length < 6) { setPasswordError("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"); return; }
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke("change-tenant-password", {
+      body: { userId: room.tenant_id, newPassword: passwordDraft },
+    });
+    setBusy(false);
+    if (error || data?.error) setPasswordError(data?.error || error.message);
+    else { setPasswordMsg("เปลี่ยนรหัสผ่านสำเร็จแล้ว"); setPasswordDraft(""); }
   };
   const saveRates = async () => {
     setBusy(true);
@@ -539,6 +554,16 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 <input type="number" value={rentDraft} onChange={(e) => setRentDraft(e.target.value)} className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} />
                 <button onClick={saveRent} disabled={busy} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: C.navy }}>บันทึก</button>
               </div>
+            </div>
+
+            <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
+              <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><Lock size={12} /> ตั้งรหัสผ่านใหม่ให้ผู้เช่า</label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="text" placeholder="อย่างน้อย 6 ตัวอักษร" value={passwordDraft} onChange={(e) => setPasswordDraft(e.target.value)} className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} />
+                <button onClick={changeTenantPassword} disabled={busy} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: C.navy }}>บันทึก</button>
+              </div>
+              {passwordMsg && <p className="text-xs mt-2" style={{ color: C.success }}>{passwordMsg}</p>}
+              {passwordError && <p className="text-xs mt-2" style={{ color: C.alert }}>{passwordError}</p>}
             </div>
 
             {!cycle || cycle.status === "awaiting_reading" ? (
