@@ -38,6 +38,15 @@ function daysSince(dateStr) {
   if (!dateStr) return 0;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
+function defaultDueDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
+function formatThaiDate(dateStr) {
+  if (!dateStr) return null;
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+}
 
 // ---------- small presentational pieces ----------
 function Gauge({ value, max, color, softColor, icon: Icon, label, unitLabel }) {
@@ -263,11 +272,25 @@ function Spinner({ label }) {
   return (<div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: C.inkSoft }}>
     <Loader2 size={22} className="animate-spin" /><span className="text-xs">{label}</span></div>);
 }
-function OverdueBanner({ days }) {
-  if (days < 3) return null;
+function DueDateRow({ cycle }) {
+  if (!cycle.due_date) return null;
+  const overdueDays = daysSince(cycle.due_date);
+  const isOverdue = overdueDays > 0;
+  return (
+    <div className="flex items-center justify-between text-xs mb-2">
+      <span style={{ color: C.inkSoft }}>วันครบกำหนดชำระ</span>
+      <span className="font-semibold" style={{ color: isOverdue ? C.alert : C.navy }}>
+        {formatThaiDate(cycle.due_date)}{isOverdue ? ` (เลยกำหนด ${overdueDays} วัน)` : ""}
+      </span>
+    </div>
+  );
+}
+function OverdueBanner({ cycle }) {
+  const days = cycle.due_date ? daysSince(cycle.due_date) : daysSince(cycle.submitted_at) - 3;
+  if (days < 1) return null;
   return (
     <div className="rounded-xl p-3 mb-4 flex items-center gap-2 text-sm font-medium" style={{ background: C.alertSoft, color: C.alert }}>
-      <History size={16} /> ค้างชำระมาแล้ว {days} วัน กรุณาชำระโดยเร็ว
+      <History size={16} /> {cycle.due_date ? `เลยกำหนดชำระมาแล้ว ${days} วัน (ครบกำหนด ${formatThaiDate(cycle.due_date)})` : `ค้างชำระมาแล้ว ${days + 3} วัน`} กรุณาชำระโดยเร็ว
     </div>
   );
 }
@@ -343,6 +366,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [passwordDraft, setPasswordDraft] = useState("");
   const [passwordMsg, setPasswordMsg] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [dueDateDraft, setDueDateDraft] = useState("");
   const [busy, setBusy] = useState(false);
 
   const room = rooms.find((r) => r.id === selectedId);
@@ -354,6 +378,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setRentDraft(r.rent);
     setPhotoDraft(r.photo || "");
     setPasswordDraft(""); setPasswordMsg(""); setPasswordError("");
+    setDueDateDraft(cyclesByRoom[r.id]?.due_date || "");
     const { data } = await supabase.from("billing_cycles").select("*").eq("room_id", r.id).eq("status", "paid").order("created_at", { ascending: false });
     setHistory(data || []);
   };
@@ -369,6 +394,12 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const savePhoto = async () => {
     setBusy(true);
     await supabase.from("rooms").update({ photo: photoDraft }).eq("id", room.id);
+    setBusy(false); onRefresh();
+  };
+  const saveDueDate = async () => {
+    if (!cycle) return;
+    setBusy(true);
+    await supabase.from("billing_cycles").update({ due_date: dueDateDraft || null }).eq("id", cycle.id);
     setBusy(false); onRefresh();
   };
   const changeTenantPassword = async () => {
@@ -411,6 +442,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
       room_id: newRoom.id, cycle_label: currentCycleLabel(),
       prev_water: newRoom.prev_water, prev_electric: newRoom.prev_electric,
       rent, water_rate: rates.water_rate, electric_rate: rates.electric_rate, status: "awaiting_reading",
+      due_date: defaultDueDate(),
     });
     setBusy(false); setShowAddRoom(false); setAddForm({ label: "", tenantId: "", rent: "", prevWater: "0", prevElectric: "0" }); setAddError("");
     onRefresh();
@@ -447,8 +479,12 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 <span className="font-bold" style={{ color: C.navy, ...display }}>{r.label}</span>
                 <div className="flex flex-col items-end gap-1">
                   {c && <Badge status={c.status} />}
-                  {c && c.status === "awaiting_payment" && daysSince(c.submitted_at) >= 3 && (
-                    <span className="text-[10px] font-semibold" style={{ color: C.alert }}>ค้างชำระ {daysSince(c.submitted_at)} วัน</span>
+                  {c && c.due_date && c.status !== "paid" && c.status !== "awaiting_reading" && (
+                    daysSince(c.due_date) > 0 ? (
+                      <span className="text-[10px] font-semibold" style={{ color: C.alert }}>เลยกำหนด {daysSince(c.due_date)} วัน</span>
+                    ) : (
+                      <span className="text-[10px]" style={{ color: C.inkSoft }}>ครบกำหนด {formatThaiDate(c.due_date)}</span>
+                    )
                   )}
                 </div>
               </div>
@@ -566,10 +602,21 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
               {passwordError && <p className="text-xs mt-2" style={{ color: C.alert }}>{passwordError}</p>}
             </div>
 
+            {cycle && (
+              <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
+                <label className="text-xs font-medium" style={{ color: C.inkSoft }}>วันครบกำหนดชำระ (รอบนี้)</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input type="date" value={dueDateDraft} onChange={(e) => setDueDateDraft(e.target.value)} className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} />
+                  <button onClick={saveDueDate} disabled={busy} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: C.navy }}>บันทึก</button>
+                </div>
+              </div>
+            )}
+
             {!cycle || cycle.status === "awaiting_reading" ? (
               <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ผู้เช่ายังไม่ได้กรอกมิเตอร์น้ำไฟของรอบนี้</div>
             ) : (
               <div className="space-y-2 text-sm">
+                <DueDateRow cycle={cycle} />
                 <MeterCompare cycle={cycle} />
                 <MeterPhotos cycle={cycle} />
                 <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
@@ -681,9 +728,10 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 
       {cycle.status === "awaiting_payment" && (
         <>
-          <OverdueBanner days={daysSince(cycle.submitted_at)} />
+          <OverdueBanner cycle={cycle} />
           <div className="rounded-2xl p-5 mb-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
             <h2 className="font-bold mb-3" style={{ color: C.navy, ...display }}>บิลรอบนี้ — {room.label} ({cycle.cycle_label})</h2>
+            <DueDateRow cycle={cycle} />
             <MeterCompare cycle={cycle} />
             <MeterPhotos cycle={cycle} />
             <div className="space-y-2 text-sm">
@@ -763,6 +811,7 @@ async function closeCycleAndAdvance(cycle, room, rates, method) {
     room_id: room.id, cycle_label: currentCycleLabel(),
     prev_water: cycle.curr_water, prev_electric: cycle.curr_electric,
     rent: room.rent, water_rate: rates.water_rate, electric_rate: rates.electric_rate, status: "awaiting_reading",
+    due_date: defaultDueDate(),
   });
 }
 
