@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode,
-  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2,
+  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2, User, IdCard, Phone,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -101,16 +101,16 @@ function MeterCompare({ cycle }) {
     </div>
   );
 }
-function MeterPhoto({ path, label }) {
+function MeterPhoto({ path, label, bucket = "meter-photos" }) {
   const [url, setUrl] = useState(null);
   useEffect(() => {
     let active = true;
     if (!path) { setUrl(null); return; }
-    supabase.storage.from("meter-photos").createSignedUrl(path, 3600).then(({ data }) => {
+    supabase.storage.from(bucket).createSignedUrl(path, 3600).then(({ data }) => {
       if (active && data) setUrl(data.signedUrl);
     });
     return () => { active = false; };
-  }, [path]);
+  }, [path, bucket]);
   return (
     <div className="flex flex-col items-center">
       <span className="text-[10px] mb-1" style={{ color: C.inkSoft }}>{label}</span>
@@ -367,6 +367,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [passwordMsg, setPasswordMsg] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [dueDateDraft, setDueDateDraft] = useState("");
+  const [tenantProfile, setTenantProfile] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const room = rooms.find((r) => r.id === selectedId);
@@ -379,8 +380,13 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setPhotoDraft(r.photo || "");
     setPasswordDraft(""); setPasswordMsg(""); setPasswordError("");
     setDueDateDraft(cyclesByRoom[r.id]?.due_date || "");
+    setTenantProfile(null);
     const { data } = await supabase.from("billing_cycles").select("*").eq("room_id", r.id).eq("status", "paid").order("created_at", { ascending: false });
     setHistory(data || []);
+    if (r.tenant_id) {
+      const { data: prof } = await supabase.from("profiles").select("*").eq("id", r.tenant_id).single();
+      setTenantProfile(prof || null);
+    }
   };
 
   const saveRent = async () => {
@@ -609,6 +615,24 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                   <input type="date" value={dueDateDraft} onChange={(e) => setDueDateDraft(e.target.value)} className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} />
                   <button onClick={saveDueDate} disabled={busy} className="px-3 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: C.navy }}>บันทึก</button>
                 </div>
+              </div>
+            )}
+
+            {tenantProfile && (
+              <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
+                <p className="text-xs font-semibold mb-2 flex items-center gap-1" style={{ color: C.inkSoft }}><User size={12} /> ข้อมูลผู้เช่า</p>
+                <div className="space-y-1.5 text-sm">
+                  <Row label="ชื่อ" value={tenantProfile.full_name || "-"} />
+                  <Row label="เบอร์โทร" value={tenantProfile.phone || "-"} />
+                  <Row label="LINE ID" value={tenantProfile.line_id || "-"} />
+                </div>
+                {tenantProfile.id_card_photo_path ? (
+                  <div className="mt-2 w-24">
+                    <MeterPhoto path={tenantProfile.id_card_photo_path} label="รูปบัตรประชาชน" bucket="tenant-documents" />
+                  </div>
+                ) : (
+                  <p className="text-xs mt-2" style={{ color: C.inkSoft }}>ผู้เช่ายังไม่ได้แนบรูปบัตรประชาชน</p>
+                )}
               </div>
             )}
 
@@ -1119,6 +1143,69 @@ function ShopTenantView({ room, property }) {
   );
 }
 
+// ---------- tenant: personal profile & ID card ----------
+function ProfileTenantView({ profile, onRefresh }) {
+  const [fullName, setFullName] = useState(profile.full_name || "");
+  const [phone, setPhone] = useState(profile.phone || "");
+  const [lineId, setLineId] = useState(profile.line_id || "");
+  const [idCardFile, setIdCardFile] = useState(null);
+  const [idCardPath, setIdCardPath] = useState(profile.id_card_photo_path || null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  const save = async () => {
+    setBusy(true); setMsg(""); setError("");
+    const updates = { full_name: fullName.trim(), phone: phone.trim(), line_id: lineId.trim() };
+    if (idCardFile) {
+      const path = `${profile.id}/id-card-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from("tenant-documents").upload(path, idCardFile, { upsert: true });
+      if (upErr) { setError(`อัปโหลดรูปบัตรไม่สำเร็จ: ${upErr.message}`); setBusy(false); return; }
+      updates.id_card_photo_path = path;
+    }
+    const { error: updErr } = await supabase.from("profiles").update(updates).eq("id", profile.id);
+    setBusy(false);
+    if (updErr) { setError(`บันทึกไม่สำเร็จ: ${updErr.message}`); return; }
+    if (updates.id_card_photo_path) setIdCardPath(updates.id_card_photo_path);
+    setIdCardFile(null);
+    setMsg("บันทึกข้อมูลเรียบร้อยแล้ว");
+    onRefresh();
+  };
+
+  return (
+    <div className="p-5 md:p-8 max-w-lg mx-auto">
+      <h1 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ color: C.navy, ...display }}><User size={20} /> ข้อมูลส่วนตัว</h1>
+      <div className="rounded-2xl p-5 space-y-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+        <div>
+          <label className="text-xs font-medium" style={{ color: C.inkSoft }}>ชื่อ-นามสกุล</label>
+          <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><Phone size={12} /> เบอร์โทรศัพท์</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เช่น 081-234-5678" className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium" style={{ color: C.inkSoft }}>LINE ID</label>
+          <input value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="เช่น @myline หรือ myline123" className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} />
+        </div>
+        <div>
+          <label className="text-xs font-medium flex items-center gap-1 mb-1" style={{ color: C.inkSoft }}><IdCard size={12} /> รูปบัตรประชาชน</label>
+          {idCardPath && !idCardFile && <MeterPhoto path={idCardPath} label="รูปที่บันทึกไว้" bucket="tenant-documents" />}
+          <div className="mt-2">
+            <PhotoPicker label="ถ่ายรูปบัตรประชาชน" file={idCardFile} onChange={setIdCardFile} />
+          </div>
+          <p className="text-[10px] mt-1" style={{ color: C.inkSoft }}>เก็บเป็นส่วนตัว มีแค่คุณและเจ้าของบ้านเท่านั้นที่ดูได้</p>
+        </div>
+        {msg && <p className="text-xs" style={{ color: C.success }}>{msg}</p>}
+        {error && <p className="text-xs" style={{ color: C.alert }}>{error}</p>}
+        <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+          {busy ? "กำลังบันทึก…" : "บันทึกข้อมูล"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
   const [profile, setProfile] = useState(null);
@@ -1195,6 +1282,9 @@ export default function App() {
       <div className="flex justify-center gap-2 py-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}` }}>
         <button onClick={() => setView("bills")} className="px-4 py-1.5 rounded-full text-xs font-semibold" style={{ background: view === "bills" ? C.navy : C.paper, color: view === "bills" ? "#fff" : C.inkSoft }}>บิล</button>
         <button onClick={() => setView("shop")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "shop" ? C.navy : C.paper, color: view === "shop" ? "#fff" : C.inkSoft }}><ShoppingCart size={13} /> ร้านค้า</button>
+        {profile.role === "tenant" && (
+          <button onClick={() => setView("profile")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "profile" ? C.navy : C.paper, color: view === "profile" ? "#fff" : C.inkSoft }}><User size={13} /> โปรไฟล์</button>
+        )}
       </div>
 
       {view === "bills" ? (
@@ -1203,10 +1293,14 @@ export default function App() {
         ) : (
           <TenantView room={myRoom} cycle={myCycle} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
         )
-      ) : profile.role === "landlord" ? (
-        <ShopLandlordView />
+      ) : view === "shop" ? (
+        profile.role === "landlord" ? (
+          <ShopLandlordView />
+        ) : (
+          <ShopTenantView room={myRoom} property={property} />
+        )
       ) : (
-        <ShopTenantView room={myRoom} property={property} />
+        <ProfileTenantView profile={profile} onRefresh={() => loadData(session.user.id)} />
       )}
     </div>
   );
