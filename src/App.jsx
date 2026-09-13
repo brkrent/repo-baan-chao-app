@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode,
-  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2, User, IdCard, Phone,
+  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2, User, CreditCard, Phone,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -1189,7 +1189,7 @@ function ProfileTenantView({ profile, onRefresh }) {
           <input value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="เช่น @myline หรือ myline123" className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }} />
         </div>
         <div>
-          <label className="text-xs font-medium flex items-center gap-1 mb-1" style={{ color: C.inkSoft }}><IdCard size={12} /> รูปบัตรประชาชน</label>
+          <label className="text-xs font-medium flex items-center gap-1 mb-1" style={{ color: C.inkSoft }}><CreditCard size={12} /> รูปบัตรประชาชน</label>
           {idCardPath && !idCardFile && <MeterPhoto path={idCardPath} label="รูปที่บันทึกไว้" bucket="tenant-documents" />}
           <div className="mt-2">
             <PhotoPicker label="ถ่ายรูปบัตรประชาชน" file={idCardFile} onChange={setIdCardFile} />
