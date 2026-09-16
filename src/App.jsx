@@ -277,12 +277,22 @@ function DueDateRow({ cycle }) {
   const overdueDays = daysSince(cycle.due_date);
   const isOverdue = overdueDays > 0;
   return (
-    <div className="flex items-center justify-between text-xs mb-2">
+    <div className="flex items-center justify-between text-xs mb-2 rounded-lg px-2 py-1.5" style={{ background: isOverdue ? C.alertSoft : C.successSoft }}>
       <span style={{ color: C.inkSoft }}>วันครบกำหนดชำระ</span>
-      <span className="font-semibold" style={{ color: isOverdue ? C.alert : C.navy }}>
+      <span className="font-semibold" style={{ color: isOverdue ? C.alert : C.success }}>
         {formatThaiDate(cycle.due_date)}{isOverdue ? ` (เลยกำหนด ${overdueDays} วัน)` : ""}
       </span>
     </div>
+  );
+}
+function DueDateBadge({ dueDate }) {
+  if (!dueDate) return null;
+  const overdueDays = daysSince(dueDate);
+  const isOverdue = overdueDays > 0;
+  return (
+    <span className="text-[10px] font-semibold" style={{ color: isOverdue ? C.alert : C.success }}>
+      {isOverdue ? `เลยกำหนด ${overdueDays} วัน` : `ครบกำหนด ${formatThaiDate(dueDate)}`}
+    </span>
   );
 }
 function OverdueBanner({ cycle }) {
@@ -485,13 +495,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 <span className="font-bold" style={{ color: C.navy, ...display }}>{r.label}</span>
                 <div className="flex flex-col items-end gap-1">
                   {c && <Badge status={c.status} />}
-                  {c && c.due_date && c.status !== "paid" && c.status !== "awaiting_reading" && (
-                    daysSince(c.due_date) > 0 ? (
-                      <span className="text-[10px] font-semibold" style={{ color: C.alert }}>เลยกำหนด {daysSince(c.due_date)} วัน</span>
-                    ) : (
-                      <span className="text-[10px]" style={{ color: C.inkSoft }}>ครบกำหนด {formatThaiDate(c.due_date)}</span>
-                    )
-                  )}
+                  {c && c.status !== "paid" && <DueDateBadge dueDate={c.due_date} />}
                 </div>
               </div>
               <div className="px-4 flex items-center gap-4 text-xs" style={{ color: C.inkSoft }}>
@@ -726,7 +730,8 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
       {cycle.status === "awaiting_reading" && (
         <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
           <h2 className="font-bold mb-1" style={{ color: C.navy, ...display }}>กรอกมิเตอร์รอบนี้ — {cycle.cycle_label}</h2>
-          <p className="text-xs mb-4" style={{ color: C.inkSoft }}>เลขมิเตอร์ครั้งก่อน — น้ำ {cycle.prev_water} · ไฟ {cycle.prev_electric}</p>
+          <p className="text-xs mb-2" style={{ color: C.inkSoft }}>เลขมิเตอร์ครั้งก่อน — น้ำ {cycle.prev_water} · ไฟ {cycle.prev_electric}</p>
+          <DueDateRow cycle={cycle} />
           <div className="grid grid-cols-2 gap-3 mb-4">
             <Gauge value={Math.max(0, water - cycle.prev_water)} max={20} color={C.water} softColor={C.waterSoft} icon={Droplet} label="น้ำ (หน่วยที่ใช้)" unitLabel="หน่วย" />
             <Gauge value={Math.max(0, electric - cycle.prev_electric)} max={150} color={C.electric} softColor={C.electricSoft} icon={Zap} label="ไฟ (หน่วยที่ใช้)" unitLabel="หน่วย" />
