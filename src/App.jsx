@@ -231,34 +231,90 @@ function ReceiptModal({ cycle, room, property, onClose }) {
   );
 }
 
-function HistoryPanel({ history, room, property }) {
+function HistoryPanel({ history, room, property, allowDelete = false }) {
+  const [list, setList] = useState(history);
+  useEffect(() => { setList(history); }, [history]);
   const [selected, setSelected] = useState(null);
-  const maxUsage = Math.max(1, ...history.flatMap((h) => [
+  const [selectMode, setSelectMode] = useState(false);
+  const [checkedIds, setCheckedIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const maxUsage = Math.max(1, ...list.flatMap((h) => [
     Math.max(0, h.curr_water - h.prev_water), Math.max(0, h.curr_electric - h.prev_electric),
   ]), 1);
+
+  const toggleCheck = (id) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => { setSelectMode(false); setCheckedIds(new Set()); };
+
+  const deleteSelected = async () => {
+    if (checkedIds.size === 0) return;
+    if (!window.confirm(`ลบประวัติที่เลือก ${checkedIds.size} รายการ? การลบไม่สามารถย้อนกลับได้`)) return;
+    setDeleting(true);
+    const ids = Array.from(checkedIds);
+    const photoPaths = [];
+    list.forEach((h) => {
+      if (ids.includes(h.id)) {
+        if (h.water_photo_path) photoPaths.push(h.water_photo_path);
+        if (h.electric_photo_path) photoPaths.push(h.electric_photo_path);
+      }
+    });
+    if (photoPaths.length) await supabase.storage.from("meter-photos").remove(photoPaths);
+    await supabase.from("billing_cycles").delete().in("id", ids);
+    setList((prev) => prev.filter((h) => !ids.includes(h.id)));
+    setDeleting(false);
+    exitSelectMode();
+  };
+
   return (
     <div className="mt-4">
-      <div className="flex items-center gap-2 mb-3"><History size={15} color={C.inkSoft} />
-        <span className="text-xs font-semibold" style={{ color: C.inkSoft }}>ประวัติย้อนหลัง</span></div>
-      {history.length === 0 ? (
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2"><History size={15} color={C.inkSoft} />
+          <span className="text-xs font-semibold" style={{ color: C.inkSoft }}>ประวัติย้อนหลัง</span></div>
+        {allowDelete && list.length > 0 && (
+          <button onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))} className="text-xs font-medium" style={{ color: selectMode ? C.inkSoft : C.navy }}>
+            {selectMode ? "ยกเลิก" : "เลือกเพื่อลบ"}
+          </button>
+        )}
+      </div>
+      {list.length === 0 ? (
         <p className="text-xs" style={{ color: C.inkSoft }}>ยังไม่มีข้อมูลย้อนหลัง</p>
       ) : (
         <div className="space-y-3">
-          {history.map((h) => {
+          {list.map((h) => {
             const b = calcCycleBill(h);
+            const checked = checkedIds.has(h.id);
             return (
-              <button key={h.id} onClick={() => setSelected(h)} className="w-full text-left rounded-xl p-3" style={{ background: C.paper }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold" style={{ color: C.navy }}>{h.cycle_label}</span>
-                  <span className="text-sm font-bold" style={mono}>฿{baht(b.total)}</span>
+              <div key={h.id} onClick={() => (selectMode ? toggleCheck(h.id) : setSelected(h))}
+                className="w-full text-left rounded-xl p-3 flex items-start gap-2 cursor-pointer" style={{ background: checked ? C.alertSoft : C.paper }}>
+                {selectMode && (
+                  <input type="checkbox" checked={checked} onChange={() => toggleCheck(h.id)} onClick={(e) => e.stopPropagation()} className="mt-1 shrink-0" />
+                )}
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold" style={{ color: C.navy }}>{h.cycle_label}</span>
+                    <span className="text-sm font-bold" style={mono}>฿{baht(b.total)}</span>
+                  </div>
+                  <UsageBar icon={Droplet} color={C.water} value={b.waterUnits} max={maxUsage} unit="น้ำ" />
+                  <UsageBar icon={Zap} color={C.electric} value={b.electricUnits} max={maxUsage} unit="ไฟ" />
+                  <div className="text-[10px] mt-1.5" style={{ color: C.inkSoft }}>{selectMode ? "แตะเพื่อเลือก" : "แตะเพื่อดูใบเสร็จ"}</div>
                 </div>
-                <UsageBar icon={Droplet} color={C.water} value={b.waterUnits} max={maxUsage} unit="น้ำ" />
-                <UsageBar icon={Zap} color={C.electric} value={b.electricUnits} max={maxUsage} unit="ไฟ" />
-                <div className="text-[10px] mt-1.5" style={{ color: C.inkSoft }}>แตะเพื่อดูใบเสร็จ</div>
-              </button>
+              </div>
             );
           })}
         </div>
+      )}
+      {selectMode && (
+        <button onClick={deleteSelected} disabled={checkedIds.size === 0 || deleting}
+          className="w-full mt-3 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
+          style={{ background: checkedIds.size === 0 ? C.alertSoft : C.alert, opacity: checkedIds.size === 0 ? 0.6 : 1 }}>
+          <Trash2 size={14} /> {deleting ? "กำลังลบ…" : `ลบที่เลือก (${checkedIds.size})`}
+        </button>
       )}
       {selected && (
         <ReceiptModal cycle={selected} room={room} property={property} onClose={() => setSelected(null)} />
@@ -790,7 +846,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 </button>
               </div>
             )}
-            <HistoryPanel history={history} room={room} property={property} />
+            <HistoryPanel history={history} room={room} property={property} allowDelete />
           </div>
         </div>
       )}
