@@ -458,6 +458,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [editElectric, setEditElectric] = useState(0);
   const [editMeterError, setEditMeterError] = useState("");
   const [savingMeterEdit, setSavingMeterEdit] = useState(false);
+  const [meterMode, setMeterModeState] = useState(true);
 
   const room = rooms.find((r) => r.id === selectedId);
   const cycle = room ? cyclesByRoom[room.id] : null;
@@ -477,6 +478,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setEditingMeter(false); setEditMeterError("");
     setEditWater(rc ? (rc.curr_water ?? rc.prev_water) : 0);
     setEditElectric(rc ? (rc.curr_electric ?? rc.prev_electric) : 0);
+    setMeterModeState(r.landlord_fills_meter !== false);
     const { data } = await supabase.from("billing_cycles").select("*").eq("room_id", r.id).eq("status", "paid").order("created_at", { ascending: false });
     setHistory(data || []);
     if (r.tenant_id) {
@@ -537,6 +539,13 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     if (!cycle) return;
     setBusy(true);
     await supabase.from("billing_cycles").update({ due_date: dueDateDraft || null }).eq("id", cycle.id);
+    setBusy(false); onRefresh();
+  };
+  const setMeterMode = async (landlordFills) => {
+    if (!room) return;
+    setMeterModeState(landlordFills);
+    setBusy(true);
+    await supabase.from("rooms").update({ landlord_fills_meter: landlordFills }).eq("id", room.id);
     setBusy(false); onRefresh();
   };
   const changeTenantPassword = async () => {
@@ -724,6 +733,21 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
             </div>
 
             <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
+              <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><Lock size={12} /> ใครเป็นคนกรอกมิเตอร์ห้องนี้</label>
+              <p className="text-[11px] mt-0.5 mb-2" style={{ color: C.inkSoft }}>ล็อกไว้ที่ "เจ้าของบ้าน" เผื่อผู้เช่าห้องนี้กรอกเลขมิเตอร์ผิดบ่อย</p>
+              <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
+                <button onClick={() => setMeterMode(true)} disabled={busy}
+                  className="flex-1 py-2 text-xs font-semibold" style={{ background: meterMode ? C.navy : "#fff", color: meterMode ? "#fff" : C.inkSoft }}>
+                  เจ้าของบ้านกรอกเอง
+                </button>
+                <button onClick={() => setMeterMode(false)} disabled={busy}
+                  className="flex-1 py-2 text-xs font-semibold" style={{ background: !meterMode ? C.navy : "#fff", color: !meterMode ? "#fff" : C.inkSoft }}>
+                  ให้ผู้เช่ากรอกเอง
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
               <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><Lock size={12} /> ตั้งรหัสผ่านใหม่ให้ผู้เช่า</label>
               <div className="flex items-center gap-2 mt-1">
                 <input type="text" placeholder="อย่างน้อย 6 ตัวอักษร" value={passwordDraft} onChange={(e) => setPasswordDraft(e.target.value)} className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} />
@@ -763,6 +787,8 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
 
             {!cycle ? (
               <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ยังไม่มีรอบบิลของห้องนี้</div>
+            ) : cycle.status === "awaiting_reading" && room.landlord_fills_meter === false ? (
+              <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ผู้เช่ายังไม่ได้กรอกมิเตอร์น้ำไฟของรอบนี้</div>
             ) : cycle.status === "awaiting_reading" ? (
               <div className="rounded-xl p-3" style={{ background: C.paper }}>
                 <p className="text-sm font-semibold mb-1" style={{ color: C.navy }}>กรอกมิเตอร์รอบนี้ — {cycle.cycle_label}</p>
@@ -858,6 +884,11 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
 function TenantView({ room, cycle, rates, property, onRefresh }) {
   const [processing, setProcessing] = useState(false);
   const [history, setHistory] = useState([]);
+  const [water, setWater] = useState(cycle ? cycle.prev_water : 0);
+  const [electric, setElectric] = useState(cycle ? cycle.prev_electric : 0);
+  const [waterPhoto, setWaterPhoto] = useState(null);
+  const [electricPhoto, setElectricPhoto] = useState(null);
+  const [photoError, setPhotoError] = useState("");
 
   useEffect(() => {
     if (!room) return;
@@ -865,8 +896,34 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
       .then(({ data }) => setHistory(data || []));
   }, [room, cycle?.status]);
 
+  useEffect(() => {
+    if (cycle) { setWater(cycle.prev_water); setElectric(cycle.prev_electric); setWaterPhoto(null); setElectricPhoto(null); setPhotoError(""); }
+  }, [cycle?.id]);
+
   if (!room || !cycle) return <Spinner label="กำลังโหลดข้อมูลห้อง…" />;
   const bill = calcCycleBill(cycle);
+  const landlordFills = room.landlord_fills_meter !== false;
+
+  const submitReading = async () => {
+    setProcessing(true);
+    setPhotoError("");
+    const updates = { curr_water: Number(water), curr_electric: Number(electric), status: "awaiting_payment", submitted_at: new Date().toISOString() };
+    if (waterPhoto) {
+      const path = `${room.id}/${cycle.id}-water-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("meter-photos").upload(path, waterPhoto, { upsert: true });
+      if (error) setPhotoError(`อัปโหลดรูปน้ำไม่สำเร็จ: ${error.message}`);
+      else updates.water_photo_path = path;
+    }
+    if (electricPhoto) {
+      const path = `${room.id}/${cycle.id}-electric-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("meter-photos").upload(path, electricPhoto, { upsert: true });
+      if (error) setPhotoError((prev) => prev ? `${prev} / อัปโหลดรูปไฟไม่สำเร็จ: ${error.message}` : `อัปโหลดรูปไฟไม่สำเร็จ: ${error.message}`);
+      else updates.electric_photo_path = path;
+    }
+    await supabase.from("billing_cycles").update(updates).eq("id", cycle.id);
+    await rotateOldPhotos(room.id);
+    setProcessing(false); onRefresh();
+  };
 
   const notifyTransferred = async () => {
     setProcessing(true);
@@ -877,14 +934,42 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
   return (
     <div className="p-5 md:p-8 max-w-lg mx-auto">
       {cycle.status === "awaiting_reading" && (
-        <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
-          <div className="flex flex-col items-center text-center py-4">
-            <Droplet size={28} color={C.water} />
-            <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>รอเจ้าของบ้านกรอกมิเตอร์</h2>
-            <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอบบิล {cycle.cycle_label} — เจ้าของบ้านจะเป็นผู้บันทึกค่าน้ำและค่าไฟ เมื่อบันทึกเสร็จ บิลจะแสดงที่นี่ให้คุณชำระเงิน</p>
+        landlordFills ? (
+          <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+            <div className="flex flex-col items-center text-center py-4">
+              <Droplet size={28} color={C.water} />
+              <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>รอเจ้าของบ้านกรอกมิเตอร์</h2>
+              <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอบบิล {cycle.cycle_label} — เจ้าของบ้านจะเป็นผู้บันทึกค่าน้ำและค่าไฟ เมื่อบันทึกเสร็จ บิลจะแสดงที่นี่ให้คุณชำระเงิน</p>
+            </div>
+            <HistoryPanel history={history} room={room} property={property} />
           </div>
-          <HistoryPanel history={history} room={room} property={property} />
-        </div>
+        ) : (
+          <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+            <h2 className="font-bold mb-1" style={{ color: C.navy, ...display }}>กรอกมิเตอร์รอบนี้ — {cycle.cycle_label}</h2>
+            <p className="text-xs mb-2" style={{ color: C.inkSoft }}>เลขมิเตอร์ครั้งก่อน — น้ำ {cycle.prev_water} · ไฟ {cycle.prev_electric}</p>
+            <DueDateRow cycle={cycle} />
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <Gauge value={Math.max(0, water - cycle.prev_water)} max={20} color={C.water} softColor={C.waterSoft} icon={Droplet} label="น้ำ (หน่วยที่ใช้)" unitLabel="หน่วย" />
+              <Gauge value={Math.max(0, electric - cycle.prev_electric)} max={150} color={C.electric} softColor={C.electricSoft} icon={Zap} label="ไฟ (หน่วยที่ใช้)" unitLabel="หน่วย" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="text-xs" style={{ color: C.inkSoft }}>เลขมิเตอร์น้ำปัจจุบัน</label>
+                <input type="number" value={water} onChange={(e) => setWater(Number(e.target.value))} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} /></div>
+              <div><label className="text-xs" style={{ color: C.inkSoft }}>เลขมิเตอร์ไฟปัจจุบัน</label>
+                <input type="number" value={electric} onChange={(e) => setElectric(Number(e.target.value))} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, ...mono }} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <PhotoPicker label="ถ่ายรูปมิเตอร์น้ำ" file={waterPhoto} onChange={setWaterPhoto} />
+              <PhotoPicker label="ถ่ายรูปมิเตอร์ไฟ" file={electricPhoto} onChange={setElectricPhoto} />
+            </div>
+            <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 3 เดือนล่าสุด รูปเก่ากว่านั้นจะถูกลบอัตโนมัติ (ตัวเลขมิเตอร์ยังเก็บถาวร)</p>
+            {photoError && <p className="text-xs mt-2 rounded-lg p-2" style={{ background: C.alertSoft, color: C.alert }}>{photoError}</p>}
+            <button onClick={submitReading} disabled={processing} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+              {processing ? "กำลังส่ง…" : "ส่งค่ามิเตอร์"}
+            </button>
+            <HistoryPanel history={history} room={room} property={property} />
+          </div>
+        )
       )}
 
       {cycle.status === "awaiting_payment" && (
