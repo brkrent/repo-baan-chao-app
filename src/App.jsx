@@ -458,6 +458,8 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [editElectric, setEditElectric] = useState(0);
   const [editMeterError, setEditMeterError] = useState("");
   const [savingMeterEdit, setSavingMeterEdit] = useState(false);
+  const [editWaterPhoto, setEditWaterPhoto] = useState(null);
+  const [editElectricPhoto, setEditElectricPhoto] = useState(null);
   const [meterMode, setMeterModeState] = useState(true);
 
   const room = rooms.find((r) => r.id === selectedId);
@@ -478,6 +480,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setEditingMeter(false); setEditMeterError("");
     setEditWater(rc ? (rc.curr_water ?? rc.prev_water) : 0);
     setEditElectric(rc ? (rc.curr_electric ?? rc.prev_electric) : 0);
+    setEditWaterPhoto(null); setEditElectricPhoto(null);
     setMeterModeState(r.landlord_fills_meter !== false);
     const { data } = await supabase.from("billing_cycles").select("*").eq("room_id", r.id).eq("status", "paid").order("created_at", { ascending: false });
     setHistory(data || []);
@@ -516,7 +519,21 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     if (Number(editElectric) < cycle.prev_electric) { setEditMeterError("เลขมิเตอร์ไฟต้องไม่น้อยกว่าเลขครั้งก่อน (" + cycle.prev_electric + ")"); return; }
     setEditMeterError("");
     setSavingMeterEdit(true);
-    await supabase.from("billing_cycles").update({ curr_water: Number(editWater), curr_electric: Number(editElectric) }).eq("id", cycle.id);
+    const updates = { curr_water: Number(editWater), curr_electric: Number(editElectric) };
+    if (editWaterPhoto) {
+      const path = `${room.id}/${cycle.id}-water-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("meter-photos").upload(path, editWaterPhoto, { upsert: true });
+      if (error) setEditMeterError(`อัปโหลดรูปน้ำไม่สำเร็จ: ${error.message}`);
+      else updates.water_photo_path = path;
+    }
+    if (editElectricPhoto) {
+      const path = `${room.id}/${cycle.id}-electric-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("meter-photos").upload(path, editElectricPhoto, { upsert: true });
+      if (error) setEditMeterError((prev) => prev ? `${prev} / อัปโหลดรูปไฟไม่สำเร็จ: ${error.message}` : `อัปโหลดรูปไฟไม่สำเร็จ: ${error.message}`);
+      else updates.electric_photo_path = path;
+    }
+    await supabase.from("billing_cycles").update(updates).eq("id", cycle.id);
+    if (editWaterPhoto || editElectricPhoto) await rotateOldPhotos(room.id);
     setSavingMeterEdit(false);
     setEditingMeter(false);
     onRefresh();
@@ -826,12 +843,17 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                       <div><label className="text-xs" style={{ color: C.inkSoft }}>เลขมิเตอร์ไฟ</label>
                         <input type="number" value={editElectric} onChange={(e) => setEditElectric(Number(e.target.value))} className="w-full mt-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} /></div>
                     </div>
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <PhotoPicker label="ถ่ายรูปมิเตอร์น้ำ" file={editWaterPhoto} onChange={setEditWaterPhoto} />
+                      <PhotoPicker label="ถ่ายรูปมิเตอร์ไฟ" file={editElectricPhoto} onChange={setEditElectricPhoto} />
+                    </div>
+                    <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ถ้าไม่เลือกรูปใหม่ รูปเดิม (ถ้ามี) จะยังอยู่เหมือนเดิม</p>
                     {editMeterError && <p className="text-xs mt-2 rounded-lg p-2" style={{ background: C.alertSoft, color: C.alert }}>{editMeterError}</p>}
                     <div className="flex gap-2 mt-3">
                       <button onClick={saveMeterEdit} disabled={savingMeterEdit} className="flex-1 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: C.navy }}>
                         {savingMeterEdit ? "กำลังบันทึก…" : "บันทึกค่าที่แก้"}
                       </button>
-                      <button onClick={() => { setEditingMeter(false); setEditMeterError(""); }} className="px-4 py-2 rounded-xl text-xs font-semibold" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.inkSoft }}>
+                      <button onClick={() => { setEditingMeter(false); setEditMeterError(""); setEditWaterPhoto(null); setEditElectricPhoto(null); }} className="px-4 py-2 rounded-xl text-xs font-semibold" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.inkSoft }}>
                         ยกเลิก
                       </button>
                     </div>
@@ -840,7 +862,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                   <>
                     <MeterCompare cycle={cycle} />
                     {cycle.status !== "paid" && (
-                      <button onClick={() => { setEditWater(cycle.curr_water ?? cycle.prev_water); setEditElectric(cycle.curr_electric ?? cycle.prev_electric); setEditingMeter(true); }}
+                      <button onClick={() => { setEditWater(cycle.curr_water ?? cycle.prev_water); setEditElectric(cycle.curr_electric ?? cycle.prev_electric); setEditWaterPhoto(null); setEditElectricPhoto(null); setEditingMeter(true); }}
                         className="flex items-center gap-1 text-xs font-medium" style={{ color: C.navy }}>
                         <Pencil size={12} /> แก้ไขเลขมิเตอร์ (กรณีลงผิด)
                       </button>
