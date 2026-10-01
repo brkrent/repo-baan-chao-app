@@ -834,7 +834,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                   <PhotoPicker label="ถ่ายรูปมิเตอร์น้ำ" file={waterPhoto} onChange={setWaterPhoto} />
                   <PhotoPicker label="ถ่ายรูปมิเตอร์ไฟ" file={electricPhoto} onChange={setElectricPhoto} />
                 </div>
-                <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 3 เดือนล่าสุด</p>
+                <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 6 เดือนล่าสุด</p>
                 {readingError && <p className="text-xs mt-2 rounded-lg p-2" style={{ background: C.alertSoft, color: C.alert }}>{readingError}</p>}
                 <button onClick={submitMeterReading} disabled={submittingReading} className="w-full mt-3 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
                   {submittingReading ? "กำลังบันทึก…" : "บันทึกค่ามิเตอร์ & แจ้งบิลผู้เช่า"}
@@ -1002,7 +1002,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
               <PhotoPicker label="ถ่ายรูปมิเตอร์น้ำ" file={waterPhoto} onChange={setWaterPhoto} />
               <PhotoPicker label="ถ่ายรูปมิเตอร์ไฟ" file={electricPhoto} onChange={setElectricPhoto} />
             </div>
-            <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 3 เดือนล่าสุด รูปเก่ากว่านั้นจะถูกลบอัตโนมัติ (ตัวเลขมิเตอร์ยังเก็บถาวร)</p>
+            <p className="text-[10px] mt-2" style={{ color: C.inkSoft }}>แนบรูปได้ไม่บังคับ — ระบบเก็บรูปไว้แค่ 6 เดือนล่าสุด รูปเก่ากว่านั้นจะถูกลบอัตโนมัติ (ตัวเลขมิเตอร์ยังเก็บถาวร)</p>
             {photoError && <p className="text-xs mt-2 rounded-lg p-2" style={{ background: C.alertSoft, color: C.alert }}>{photoError}</p>}
             <button onClick={submitReading} disabled={processing} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
               {processing ? "กำลังส่ง…" : "ส่งค่ามิเตอร์"}
@@ -1069,15 +1069,15 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 }
 
 // ---------- shared: close a cycle, record payment, open the next one ----------
-// ---------- keep only the 3 most recent meter photos per room ----------
+// ---------- keep only the 6 most recent meter photos per room (ประมาณ 6 เดือน เพราะปิดรอบเดือนละครั้ง) ----------
 async function rotateOldPhotos(roomId) {
   const { data: cycles } = await supabase.from("billing_cycles")
     .select("id, water_photo_path, electric_photo_path")
     .eq("room_id", roomId)
     .or("water_photo_path.not.is.null,electric_photo_path.not.is.null")
     .order("created_at", { ascending: false });
-  if (!cycles || cycles.length <= 3) return;
-  const toClear = cycles.slice(3);
+  if (!cycles || cycles.length <= 6) return;
+  const toClear = cycles.slice(6);
   const paths = [];
   toClear.forEach((c) => {
     if (c.water_photo_path) paths.push(c.water_photo_path);
