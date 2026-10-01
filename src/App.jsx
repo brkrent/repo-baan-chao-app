@@ -59,6 +59,11 @@ function formatThaiDate(dateStr) {
   if (!dateStr) return null;
   return new Date(dateStr + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
 }
+// ยังไม่ให้กรอกมิเตอร์ถ้ายังไม่ถึงวันครบกำหนด (ถ้ารอบไหนไม่มีวันครบกำหนด ให้กรอกได้ตามปกติ)
+function isMeterEntryAllowed(cycle) {
+  if (!cycle || !cycle.due_date) return true;
+  return daysSince(cycle.due_date) >= 0;
+}
 
 // ---------- small presentational pieces ----------
 function Gauge({ value, max, color, softColor, icon: Icon, label, unitLabel }) {
@@ -806,6 +811,10 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
               <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ยังไม่มีรอบบิลของห้องนี้</div>
             ) : cycle.status === "awaiting_reading" && room.landlord_fills_meter === false ? (
               <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ผู้เช่ายังไม่ได้กรอกมิเตอร์น้ำไฟของรอบนี้</div>
+            ) : cycle.status === "awaiting_reading" && !isMeterEntryAllowed(cycle) ? (
+              <div className="rounded-xl p-4 text-sm" style={{ background: C.paper }}>
+                <p style={{ color: C.inkSoft }}>ยังไม่ถึงวันครบกำหนดของรอบนี้ — กรอกมิเตอร์ได้ตั้งแต่วันที่ <b style={{ color: C.navy }}>{formatThaiDate(cycle.due_date)}</b></p>
+              </div>
             ) : cycle.status === "awaiting_reading" ? (
               <div className="rounded-xl p-3" style={{ background: C.paper }}>
                 <p className="text-sm font-semibold mb-1" style={{ color: C.navy }}>กรอกมิเตอร์รอบนี้ — {cycle.cycle_label}</p>
@@ -962,6 +971,15 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
               <Droplet size={28} color={C.water} />
               <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>รอเจ้าของบ้านกรอกมิเตอร์</h2>
               <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอบบิล {cycle.cycle_label} — เจ้าของบ้านจะเป็นผู้บันทึกค่าน้ำและค่าไฟ เมื่อบันทึกเสร็จ บิลจะแสดงที่นี่ให้คุณชำระเงิน</p>
+            </div>
+            <HistoryPanel history={history} room={room} property={property} />
+          </div>
+        ) : !isMeterEntryAllowed(cycle) ? (
+          <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+            <div className="flex flex-col items-center text-center py-4">
+              <Droplet size={28} color={C.water} />
+              <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>ยังไม่ถึงวันกรอกมิเตอร์</h2>
+              <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอบบิล {cycle.cycle_label} — กรอกมิเตอร์ได้ตั้งแต่วันที่ <b style={{ color: C.navy }}>{formatThaiDate(cycle.due_date)}</b></p>
             </div>
             <HistoryPanel history={history} room={room} property={property} />
           </div>
