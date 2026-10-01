@@ -226,9 +226,26 @@ function LeaseDocsEditor({ room, onRefresh }) {
     onRefresh();
   };
 
+  const clearAll = async () => {
+    if (paths.length === 0) return;
+    if (!window.confirm(`ลบรูปสัญญาเช่าทั้งหมด ${paths.length} รูปของห้องนี้? ใช้ตอนเปลี่ยนผู้เช่าใหม่ เพื่อไม่ให้สัญญาเก่าปนกับผู้เช่าใหม่`)) return;
+    setBusy(true);
+    await supabase.storage.from("tenant-documents").remove(paths);
+    await supabase.from("rooms").update({ lease_photo_paths: [] }).eq("id", room.id);
+    setBusy(false);
+    onRefresh();
+  };
+
   return (
     <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
-      <label className="text-xs font-medium flex items-center gap-1 mb-2" style={{ color: C.inkSoft }}><ImageIcon size={12} /> รูปสัญญาเช่า (แนบได้หลายหน้า เช่น หน้า 1, หน้า 2)</label>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><ImageIcon size={12} /> รูปสัญญาเช่า (แนบได้หลายหน้า เช่น หน้า 1, หน้า 2)</label>
+        {paths.length > 0 && (
+          <button onClick={clearAll} disabled={busy} type="button" className="flex items-center gap-1 text-xs font-medium" style={{ color: C.alert }}>
+            <Trash2 size={12} /> ลบทั้งหมด
+          </button>
+        )}
+      </div>
       {paths.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-2">
           {paths.map((p) => <LeaseDocThumb key={p} path={p} onDelete={deletePhoto} deleting={busy} />)}
