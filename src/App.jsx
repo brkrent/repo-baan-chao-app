@@ -168,6 +168,81 @@ function PhotoPicker({ label, file, onChange }) {
     </label>
   );
 }
+// ---------- รูปสัญญาเช่า (แนบได้หลายหน้า เก็บใน tenant-documents bucket) ----------
+function LeaseDocThumb({ path, onDelete, deleting }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let active = true;
+    supabase.storage.from("tenant-documents").createSignedUrl(path, 3600).then(({ data }) => {
+      if (active && data) setUrl(data.signedUrl);
+    });
+    return () => { active = false; };
+  }, [path]);
+  return (
+    <div className="relative">
+      {url ? (
+        <img src={url} alt="สัญญาเช่า" className="w-full h-24 object-cover rounded-lg" style={{ border: `1px solid ${C.line}` }} />
+      ) : (
+        <div className="w-full h-24 rounded-lg flex items-center justify-center" style={{ background: "#E4E1D4" }}>
+          <Loader2 size={16} className="animate-spin" color={C.inkSoft} />
+        </div>
+      )}
+      <button onClick={() => onDelete(path)} disabled={deleting} type="button"
+        className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
+        <X size={12} color="#fff" />
+      </button>
+    </div>
+  );
+}
+function LeaseDocsEditor({ room, onRefresh }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const paths = room.lease_photo_paths || [];
+  const folder = room.tenant_id || room.id;
+
+  const addFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+    setBusy(true); setError("");
+    const uploaded = [];
+    for (let i = 0; i < files.length; i++) {
+      const path = `${folder}/lease-${Date.now()}-${i}.jpg`;
+      const { error: upErr } = await supabase.storage.from("tenant-documents").upload(path, files[i], { upsert: true });
+      if (upErr) setError((prev) => prev ? `${prev} / ${upErr.message}` : upErr.message);
+      else uploaded.push(path);
+    }
+    if (uploaded.length) {
+      await supabase.from("rooms").update({ lease_photo_paths: [...paths, ...uploaded] }).eq("id", room.id);
+    }
+    setBusy(false);
+    onRefresh();
+  };
+
+  const deletePhoto = async (path) => {
+    setBusy(true);
+    await supabase.storage.from("tenant-documents").remove([path]);
+    await supabase.from("rooms").update({ lease_photo_paths: paths.filter((p) => p !== path) }).eq("id", room.id);
+    setBusy(false);
+    onRefresh();
+  };
+
+  return (
+    <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
+      <label className="text-xs font-medium flex items-center gap-1 mb-2" style={{ color: C.inkSoft }}><ImageIcon size={12} /> รูปสัญญาเช่า (แนบได้หลายหน้า เช่น หน้า 1, หน้า 2)</label>
+      {paths.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          {paths.map((p) => <LeaseDocThumb key={p} path={p} onDelete={deletePhoto} deleting={busy} />)}
+        </div>
+      )}
+      <label className="flex items-center justify-center gap-1 rounded-xl p-2.5 cursor-pointer text-xs font-medium" style={{ background: "#fff", border: `1px dashed ${C.line}`, color: C.navy }}>
+        <input type="file" accept="image/*" multiple className="hidden" disabled={busy} onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+        <Camera size={14} /> {busy ? "กำลังอัปโหลด…" : "ถ่าย/เลือกรูปสัญญา (เลือกได้หลายรูปพร้อมกัน)"}
+      </label>
+      {paths.length === 0 && !busy && <p className="text-[10px] mt-1.5" style={{ color: C.inkSoft }}>แนะนำอย่างน้อย 2 รูป (เช่น หน้าแรกกับหน้าที่มีลายเซ็น)</p>}
+      {error && <p className="text-xs mt-2 rounded-lg p-2" style={{ background: C.alertSoft, color: C.alert }}>{error}</p>}
+    </div>
+  );
+}
 function UsageBar({ icon: Icon, color, value, max, unit }) {
   const pct = Math.min(100, (value / max) * 100);
   return (
@@ -806,6 +881,8 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 )}
               </div>
             )}
+
+            <LeaseDocsEditor room={room} onRefresh={onRefresh} />
 
             {!cycle ? (
               <div className="rounded-xl p-4 text-sm" style={{ background: C.alertSoft, color: C.alert }}>ยังไม่มีรอบบิลของห้องนี้</div>
