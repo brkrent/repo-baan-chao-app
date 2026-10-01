@@ -1,0 +1,22 @@
+name: ปลุก Supabase ไม่ให้ถูกพัก
+
+# ทำงานอัตโนมัติทุกวันจันทร์ เวลาประมาณ 09:00 เมืองไทย (02:00 UTC)
+# แค่ยิง request อ่านข้อมูลเล็กๆ ไปที่ฐานข้อมูล Supabase เพื่อนับเป็น "มีการใช้งาน"
+# กันไม่ให้โปรเจกต์ถูกพักอัตโนมัติเพราะไม่มีใครเข้าแอปเกิน 7 วัน
+# กดรันเองได้ด้วยที่แท็บ Actions > เลือก workflow นี้ > Run workflow
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          curl -sf "https://szlrattkvjrgipitqrsz.supabase.co/rest/v1/rates?select=id" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6bHJhdHRrdmpyZ2lwaXRxcnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0MjQ0NjUsImV4cCI6MjEwNDAwMDQ2NX0.O8lDRAbH-MCN6GlEj03hlVS5hw5TkXKn_USIquQ9NOE" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6bHJhdHRrdmpyZ2lwaXRxcnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0MjQ0NjUsImV4cCI6MjEwNDAwMDQ2NX0.O8lDRAbH-MCN6GlEj03hlVS5hw5TkXKn_USIquQ9NOE" \
+            && echo "ping สำเร็จ — Supabase ยังตื่นอยู่"
