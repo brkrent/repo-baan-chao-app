@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Home, Droplet, Zap, Settings, X, CheckCircle2, QrCode,
-  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2, User, CreditCard, Phone,
+  Wallet, LogOut, History, Lock, Mail, Image as ImageIcon, Pencil, Plus, Loader2, Camera, ShoppingCart, Minus, Trash2, User, CreditCard, Phone, FileText,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -1562,6 +1562,64 @@ function ProfileTenantView({ profile, onRefresh }) {
   );
 }
 
+// ---------- กฎการเช่า (เจ้าของแก้ไขได้ตลอด ผู้เช่าดูอย่างเดียว) ----------
+function RulesView({ property, role, onRefresh }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(property?.rules || "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { setDraft(property?.rules || ""); }, [property?.rules]);
+
+  const save = async () => {
+    setBusy(true); setMsg("");
+    await supabase.from("property_settings").update({ rules: draft }).eq("id", 1);
+    setBusy(false);
+    setEditing(false);
+    setMsg("บันทึกกฎการเช่าเรียบร้อยแล้ว");
+    onRefresh();
+  };
+
+  const isLandlord = role === "landlord";
+
+  return (
+    <div className="p-5 md:p-8 max-w-lg mx-auto">
+      <h1 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ color: C.navy, ...display }}><FileText size={20} /> กฎการเช่า</h1>
+      <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+        {isLandlord && editing ? (
+          <>
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={12}
+              placeholder="เช่น ห้ามเลี้ยงสัตว์ในห้อง, ชำระค่าเช่าก่อนวันที่ 5 ของทุกเดือน, ห้ามส่งเสียงดังหลัง 22:00 น. ฯลฯ"
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, lineHeight: 1.6 }} />
+            <div className="flex gap-2 mt-3">
+              <button onClick={save} disabled={busy} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: C.navy }}>
+                {busy ? "กำลังบันทึก…" : "บันทึกกฎการเช่า"}
+              </button>
+              <button onClick={() => { setEditing(false); setDraft(property?.rules || ""); }} className="px-4 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.inkSoft }}>
+                ยกเลิก
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {property?.rules ? (
+              <p className="text-sm whitespace-pre-wrap" style={{ color: C.ink, lineHeight: 1.7 }}>{property.rules}</p>
+            ) : (
+              <p className="text-sm" style={{ color: C.inkSoft }}>{isLandlord ? "ยังไม่ได้ตั้งกฎการเช่า กดปุ่มด้านล่างเพื่อเพิ่ม" : "เจ้าของบ้านยังไม่ได้ตั้งกฎการเช่า"}</p>
+            )}
+            {isLandlord && (
+              <button onClick={() => setEditing(true)} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: C.navy }}>
+                <Pencil size={14} /> {property?.rules ? "แก้ไขกฎการเช่า" : "เพิ่มกฎการเช่า"}
+              </button>
+            )}
+          </>
+        )}
+        {msg && !editing && <p className="text-xs mt-3" style={{ color: C.success }}>{msg}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
   const [profile, setProfile] = useState(null);
@@ -1641,6 +1699,7 @@ export default function App() {
         {profile.role === "tenant" && (
           <button onClick={() => setView("profile")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "profile" ? C.navy : C.paper, color: view === "profile" ? "#fff" : C.inkSoft }}><User size={13} /> โปรไฟล์</button>
         )}
+        <button onClick={() => setView("rules")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "rules" ? C.navy : C.paper, color: view === "rules" ? "#fff" : C.inkSoft }}><FileText size={13} /> กฎการเช่า</button>
       </div>
 
       {view === "bills" ? (
@@ -1655,6 +1714,8 @@ export default function App() {
         ) : (
           <ShopTenantView room={myRoom} property={property} />
         )
+      ) : view === "rules" ? (
+        <RulesView property={property} role={profile.role} onRefresh={() => loadData(session.user.id)} />
       ) : (
         <ProfileTenantView profile={profile} onRefresh={() => loadData(session.user.id)} />
       )}
