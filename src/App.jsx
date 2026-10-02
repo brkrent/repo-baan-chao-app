@@ -1928,8 +1928,12 @@ export default function App() {
   const theme = getTheme(property);
   const themeKey = resolveThemeKey(property);
 
+  const themedBg = themeKey !== "default"
+    ? `linear-gradient(180deg, ${theme.headerBg}33 0px, ${theme.headerBg}14 220px, ${C.paper} 460px, ${C.paper} 100%)`
+    : C.paper;
+
   return (
-    <div className="min-h-screen w-full" style={{ background: C.paper, fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen w-full" style={{ background: themedBg, fontFamily: "'Inter', sans-serif" }}>
       <div className="sticky top-0 z-10 flex items-center justify-between px-5 md:px-8 py-3 tfx-header" style={{ background: theme.headerBg }}>
         <ThemeFxStyle />
         <HeaderFx theme={theme} />
@@ -1948,9 +1952,16 @@ export default function App() {
       </div>
 
       {theme && themeKey !== "default" && theme.fact && (
-        <div className="px-5 md:px-8 py-2.5 text-xs flex items-start gap-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}`, color: C.inkSoft, borderLeft: `3px solid ${theme.accent}` }}>
-          <span style={{ fontSize: 14, lineHeight: 1 }}>💡</span>
-          <span><b style={{ color: C.ink }}>รู้หรือไม่?</b> {theme.fact}</span>
+        <div className="tfx-header px-5 md:px-8 pt-8 pb-4 md:pt-9 md:pb-5" style={{ background: `linear-gradient(135deg, ${theme.headerBg}, ${theme.accent})` }}>
+          <ThemeFxStyle />
+          <HeaderFx theme={theme} />
+          <div style={{ position: "relative", zIndex: 2, textAlign: "center", fontSize: 44, lineHeight: 1, marginBottom: 10, filter: "drop-shadow(0 6px 10px rgba(0,0,0,.25))" }}>
+            {theme.emoji}
+          </div>
+          <div className="mx-auto" style={{ position: "relative", zIndex: 2, maxWidth: 520, background: "rgba(255,255,255,0.94)", borderRadius: 14, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 9, fontSize: 12.5, lineHeight: 1.6, color: C.ink, boxShadow: "0 8px 20px -8px rgba(0,0,0,.35)" }}>
+            <span style={{ fontSize: 15, lineHeight: 1 }}>💡</span>
+            <span><b>รู้หรือไม่?</b> {theme.fact}</span>
+          </div>
         </div>
       )}
 
