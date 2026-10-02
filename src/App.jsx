@@ -16,6 +16,237 @@ const display = { fontFamily: "'Space Grotesk', 'Inter', sans-serif" };
 const mono = { fontFamily: "'IBM Plex Mono', monospace" };
 const baht = (n) => Math.round(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 });
 
+// ---------- ธีมตามเทศกาล/วันสำคัญ — เจ้าของบ้านเปลี่ยนได้จากหน้าตั้งค่าในแอป ไม่ต้องแก้โค้ด/อัปโหลดใหม่ ----------
+// เลือก "อัตโนมัติ" ได้ด้วย — ระบบจะขึ้นธีมให้เอง 7 วันก่อนถึงวันงานจนถึง 7 วันหลังวันงาน
+// ถ้ามีวันสำคัญอื่นเหลื่อมกัน จะเลือกวันที่ใกล้ "วันจริง" ที่สุดให้ขึ้นก่อน
+const THEMES = {
+  default: { label: "ปกติ", category: "เริ่มต้น", headerBg: C.navy, accent: C.navy, emoji: "" },
+
+  songkran: { label: "สงกรานต์", category: "เทศกาลรื่นเริง", headerBg: "#1E6FA8", accent: "#1E6FA8", emoji: "💦",
+    fact: "สงกรานต์คือวันขึ้นปีใหม่ไทยแบบดั้งเดิม เดิมเน้นการสรงน้ำพระและรดน้ำขอพรผู้ใหญ่ ก่อนจะกลายเป็นเทศกาลสาดน้ำที่รู้จักกันทั่วโลก",
+    particle: ["droplet", "splash"], scene: [{ e: "🐘", left: 0, top: 30, size: 56, anim: "patrol" }, { e: "🌺", left: 86, top: 62, size: 26, anim: "sway", delay: .3 }] },
+  loykrathong: { label: "ลอยกระทง", category: "เทศกาลรื่นเริง", headerBg: "#3A2E5C", accent: "#C9972F", emoji: "🏮",
+    fact: "ลอยกระทงจัดขึ้นคืนวันเพ็ญเดือน 12 เพื่อขอขมาและแสดงความกตัญญูต่อพระแม่คงคา เชื่อกันว่าเป็นการลอยทิ้งสิ่งไม่ดีไปกับสายน้ำ",
+    particle: ["lantern", "glow"], scene: [{ e: "🛶", left: 0, top: 45, size: 46, anim: "patrolsmall" }, { e: "🏮", left: 88, top: 15, size: 28, anim: "sway", delay: .4 }] },
+  newyear: { label: "ปีใหม่", category: "เทศกาลรื่นเริง", headerBg: "#7A1F2B", accent: "#B5892B", emoji: "🎉",
+    fact: "ไทยเริ่มใช้วันที่ 1 มกราคม เป็นวันขึ้นปีใหม่สากลอย่างเป็นทางการตั้งแต่ปี พ.ศ. 2484 แทนวันขึ้นปีใหม่เดิมคือ 1 เมษายน",
+    particle: ["confetti", "spark"], scene: [{ e: "🎆", left: 6, top: 15, size: 34, anim: "still" }, { e: "🎇", left: 88, top: 20, size: 30, anim: "still", delay: .4 }] },
+  christmas: { label: "คริสต์มาส", category: "เทศกาลรื่นเริง", headerBg: "#1E5C3A", accent: "#B5292F", emoji: "🎄",
+    fact: "วันคริสต์มาสระลึกถึงการประสูติของพระเยซู เป็นเทศกาลสำคัญของชาวคริสต์ทั่วโลก ส่วนในไทยนิยมฉลองกันทั่วไปแบบไม่เน้นศาสนา",
+    particle: ["snow", "glow"], scene: [{ e: "🛷", left: 0, top: 12, size: 48, anim: "patrol" }, { e: "🎄", left: 88, top: 50, size: 40, anim: "sway", delay: .2 }] },
+  halloween: { label: "ฮาโลวีน", category: "เทศกาลรื่นเริง", headerBg: "#2B2130", accent: "#D97A2A", emoji: "🎃",
+    fact: "ฮาโลวีนมีต้นกำเนิดจากเทศกาลเคลติกโบราณ เชื่อว่าเป็นคืนที่เส้นแบ่งระหว่างโลกมนุษย์กับโลกวิญญาณบางที่สุดในรอบปี",
+    particle: ["bat", "glow"], scene: [{ e: "🧙", left: 0, top: 25, size: 50, anim: "patrol" }, { e: "🎃", left: 88, top: 58, size: 30, anim: "still", delay: .3 }] },
+  chinesenewyear: { label: "ตรุษจีน", category: "เทศกาลรื่นเริง", headerBg: "#7A1620", accent: "#C9972F", emoji: "🧧",
+    fact: "ตรุษจีนคือวันขึ้นปีใหม่ตามปฏิทินจันทรคติจีน ครอบครัวจะไหว้บรรพบุรุษและแจกอั่งเปาสีแดง-ทอง เพื่อความเป็นสิริมงคล",
+    particle: ["redgold", "glow"], scene: [{ e: "🐉", left: 0, top: 25, size: 64, anim: "patrol" }, { e: "🏮", left: 86, top: 14, size: 28, anim: "sway", delay: .3 }] },
+  midautumn: { label: "ไหว้พระจันทร์", category: "เทศกาลรื่นเริง", headerBg: "#14204A", accent: "#C9A227", emoji: "🎑",
+    fact: "เทศกาลไหว้พระจันทร์จัดคืนวันเพ็ญเดือน 8 ตามจันทรคติจีน เพื่อขอบคุณพระจันทร์และความอุดมสมบูรณ์ สัญลักษณ์คือขนมไหว้พระจันทร์และกระต่าย",
+    particle: ["lantern", "glow"], scene: [{ e: "🐇", left: 0, top: 50, size: 40, anim: "patrolsmall" }, { e: "🎑", left: 88, top: 16, size: 36, anim: "still", delay: .2 }] },
+  vegetarian: { label: "กินเจ", category: "เทศกาลรื่นเริง", headerBg: "#8A6A1E", accent: "#C9A227", emoji: "🟡",
+    fact: "เทศกาลกินเจกินเวลา 9 วัน ผู้ร่วมงานละเว้นเนื้อสัตว์เพื่อชำระกายใจให้บริสุทธิ์ นิยมมากในภาคใต้ โดยเฉพาะที่จังหวัดภูเก็ต",
+    particle: ["petal", "glow"], scene: [{ e: "🚩", left: 6, top: 16, size: 28, anim: "sway" }, { e: "🥬", left: 88, top: 55, size: 26, anim: "bob", delay: .3 }] },
+  sartthai: { label: "วันสารทไทย", category: "เทศกาลรื่นเริง", headerBg: "#5C4A1E", accent: "#C9972F", emoji: "🌾",
+    fact: "วันสารทไทยตรงกับวันแรม 15 ค่ำ เดือน 10 เป็นวันทำบุญอุทิศส่วนกุศลให้บรรพบุรุษ ขนมประจำเทศกาลคือกระยาสารทที่ทำจากข้าวตากคลุกน้ำตาลและถั่ว",
+    particle: ["petal", "glow"], scene: [{ e: "🌾", left: 6, top: 60, size: 30, anim: "sway" }, { e: "🍯", left: 88, top: 20, size: 26, anim: "bob", delay: .3 }] },
+
+  makhabucha: { label: "มาฆบูชา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A3B2A", accent: "#C9972F", emoji: "🪷",
+    fact: "วันมาฆบูชาระลึกถึงวันที่พระพุทธเจ้าทรงแสดง “โอวาทปาฏิโมกข์” แก่พระอรหันต์ 1,250 องค์ ที่มาประชุมพร้อมกันโดยมิได้นัดหมาย",
+    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }] },
+  visakhabucha: { label: "วิสาขบูชา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A3B2A", accent: "#C9972F", emoji: "🪷",
+    fact: "วันวิสาขบูชาเป็นวันประสูติ ตรัสรู้ และปรินิพพานของพระพุทธเจ้า ตรงกันทั้งสามเหตุการณ์ในวันเดียว องค์การสหประชาชาติยกให้เป็นวันสำคัญของโลก",
+    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }] },
+  asalhabucha: { label: "อาสาฬหบูชา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A3B2A", accent: "#C9972F", emoji: "🪷",
+    fact: "วันอาสาฬหบูชาระลึกถึงการแสดงปฐมเทศนาครั้งแรกของพระพุทธเจ้า คือ “ธัมมจักกัปปวัตนสูตร” นับเป็นวันที่เกิดพระสงฆ์องค์แรกในพระพุทธศาสนา",
+    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }] },
+  khaophansa: { label: "เข้าพรรษา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#1E2E1E", accent: "#8A6A2E", emoji: "🕯️",
+    fact: "วันเข้าพรรษาคือวันที่พระสงฆ์เริ่มจำพรรษาอยู่ ณ วัดใดวัดหนึ่งตลอด 3 เดือนในฤดูฝน เป็นที่มาของประเพณีถวายเทียนพรรษาที่สืบทอดมานาน",
+    particle: ["petal", "glow"], scene: [{ e: "🕯️", left: 6, top: 55, size: 34, anim: "still" }, { e: "🌧️", left: 88, top: 16, size: 26, anim: "bob", delay: .3 }] },
+  okphansa: { label: "ออกพรรษา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A2A12", accent: "#D97A2A", emoji: "🛶",
+    fact: "วันออกพรรษาคือวันสิ้นสุดการจำพรรษา 3 เดือนของพระสงฆ์ มีประเพณีตักบาตรเทโวและไหลเรือไฟที่สืบทอดมาในหลายจังหวัดริมแม่น้ำ",
+    particle: ["glow"], scene: [{ e: "🛶", left: 0, top: 50, size: 42, anim: "patrolsmall" }, { e: "🔥", left: 88, top: 20, size: 24, anim: "bob", delay: .3 }] },
+
+  chakri: { label: "วันจักรี", category: "วันสำคัญของชาติ", headerBg: "#0E2036", accent: "#C9A227", emoji: "🏛️",
+    fact: "วันจักรีระลึกถึงวันที่พระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลกมหาราชทรงสถาปนาราชวงศ์จักรีและกรุงเทพมหานคร เมื่อปี พ.ศ. 2325",
+    particle: ["glow"], scene: [{ e: "🏛️", left: 88, top: 45, size: 34, anim: "still" }] },
+  chatramongkol: { label: "วันฉัตรมงคล", category: "วันสำคัญของชาติ", headerBg: "#4A1018", accent: "#C9A227", emoji: "👑",
+    fact: "วันฉัตรมงคลระลึกถึงพระราชพิธีบรมราชาภิเษก ซึ่งเป็นพระราชพิธีโบราณที่สถาปนาพระมหากษัตริย์ให้สมบูรณ์ตามราชประเพณี",
+    particle: ["glow"], scene: [{ e: "👑", left: 88, top: 20, size: 30, anim: "still" }] },
+  childrenday: { label: "วันเด็กแห่งชาติ", category: "วันสำคัญของชาติ", headerBg: "#1E8FA8", accent: "#D9A227", emoji: "🎈",
+    fact: "วันเด็กแห่งชาติจัดขึ้นเสาร์ที่สองของเดือนมกราคมทุกปี เริ่มจัดครั้งแรกเมื่อปี พ.ศ. 2498 เพื่อให้ความสำคัญกับเด็กในฐานะกำลังสำคัญของชาติในอนาคต",
+    particle: ["confetti", "balloon"], scene: [{ e: "🪁", left: 0, top: 18, size: 36, anim: "patrolsmall" }, { e: "🎈", left: 88, top: 55, size: 28, anim: "bob", delay: .3 }] },
+  teacherday: { label: "วันครู", category: "วันสำคัญของชาติ", headerBg: "#16263B", accent: "#C9972F", emoji: "📚",
+    fact: "วันครูแห่งชาติตรงกับวันที่ 16 มกราคมของทุกปี เริ่มจัดครั้งแรกเมื่อปี พ.ศ. 2500 เพื่อระลึกถึงพระคุณของครู ประเพณีสำคัญคือพิธีไหว้ครูด้วยดอกเข็มและหญ้าแพรก",
+    particle: ["petal", "glow"], scene: [{ e: "📚", left: 88, top: 50, size: 28, anim: "still" }] },
+};
+
+// รายการวันที่ของแต่ละธีม ใช้คำนวณ "ธีมอัตโนมัติ" — ขึ้นก่อนวันจริง 7 วัน ถึงหลังวันจริง 7 วัน
+// kind "fixed" = วันที่ตรงทุกปี (ไม่ต้องอัปเดต) | "nthWeekday" = คำนวณจากวันในสัปดาห์ (ไม่ต้องอัปเดต)
+// kind "lunar" = วันตามจันทรคติ เปลี่ยนทุกปี ต้องมาเพิ่มวันที่ของปีถัดไปใน "dates" ทุกปลายปี (ถ้าไม่เพิ่ม ปีนั้นจะข้ามธีมนี้ไปเฉยๆ ไม่ error)
+const FESTIVALS = [
+  { key: "newyear", kind: "fixed", month: 1, day: 1 },
+  { key: "childrenday", kind: "nthWeekday", month: 1, weekday: 6, n: 2 },
+  { key: "teacherday", kind: "fixed", month: 1, day: 16 },
+  { key: "chinesenewyear", kind: "lunar", dates: { 2026: "2026-02-17" } },
+  { key: "makhabucha", kind: "lunar", dates: { 2026: "2026-03-03" } },
+  { key: "chakri", kind: "fixed", month: 4, day: 6 },
+  { key: "songkran", kind: "fixed", month: 4, day: 13, length: 3 },
+  { key: "chatramongkol", kind: "fixed", month: 5, day: 4 },
+  { key: "visakhabucha", kind: "lunar", dates: { 2026: "2026-05-31" } },
+  { key: "asalhabucha", kind: "lunar", dates: { 2026: "2026-07-28" } },
+  { key: "khaophansa", kind: "lunar", dates: { 2026: "2026-07-29" } },
+  { key: "midautumn", kind: "lunar", dates: { 2026: "2026-09-25" } },
+  { key: "vegetarian", kind: "lunar", dates: { 2026: "2026-10-10" }, length: 9 },
+  { key: "sartthai", kind: "lunar", dates: { 2026: "2026-10-19" } },
+  { key: "okphansa", kind: "lunar", dates: { 2026: "2026-10-26" } },
+  { key: "halloween", kind: "fixed", month: 10, day: 31 },
+  { key: "loykrathong", kind: "lunar", dates: { 2026: "2026-11-25" } },
+  { key: "christmas", kind: "fixed", month: 12, day: 25 },
+];
+
+function stripTime(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function daysBetween(a, b) { return Math.round((stripTime(b) - stripTime(a)) / 86400000); }
+function nthWeekdayOfMonth(year, month, weekday, n) {
+  const d = new Date(year, month - 1, 1);
+  let count = 0;
+  while (true) {
+    if (d.getDay() === weekday) { count++; if (count === n) return new Date(d); }
+    d.setDate(d.getDate() + 1);
+  }
+}
+function getFestivalStart(f, year) {
+  if (f.kind === "fixed") return new Date(year, f.month - 1, f.day);
+  if (f.kind === "nthWeekday") return nthWeekdayOfMonth(year, f.month, f.weekday, f.n);
+  if (f.kind === "lunar") return f.dates[year] ? new Date(f.dates[year] + "T00:00:00") : null;
+  return null;
+}
+// หาธีมที่ควรขึ้นวันนี้ — ขึ้นก่อนวันจริง 7 วัน ถึงหลังวันจริง 7 วัน ถ้าซ้อนกันหลายวัน เลือกวันที่ "ใกล้วันจริง" ที่สุด
+function resolveAutoThemeKey(now = new Date()) {
+  const today = stripTime(now);
+  const year = today.getFullYear();
+  let bestKey = null, bestDist = Infinity;
+  FESTIVALS.forEach((f) => {
+    [year - 1, year, year + 1].forEach((y) => {
+      const start = getFestivalStart(f, y);
+      if (!start) return;
+      const length = f.length || 1;
+      const end = new Date(start); end.setDate(end.getDate() + length - 1);
+      const winStart = new Date(start); winStart.setDate(winStart.getDate() - 7);
+      const winEnd = new Date(end); winEnd.setDate(winEnd.getDate() + 7);
+      if (today >= winStart && today <= winEnd) {
+        const dist = today < start ? daysBetween(today, start) : today > end ? daysBetween(end, today) : 0;
+        if (dist < bestDist) { bestDist = dist; bestKey = f.key; }
+      }
+    });
+  });
+  return bestKey || "default";
+}
+function resolveThemeKey(property) {
+  const raw = property?.theme || "default";
+  return raw === "auto" ? resolveAutoThemeKey() : raw;
+}
+function getTheme(property) {
+  return THEMES[resolveThemeKey(property)] || THEMES.default;
+}
+
+// ---------- ลูกเล่นภาพเคลื่อนไหวของธีม (มาสคอต + ประกาย) — อยู่ในกรอบแถบหัวเท่านั้น ไม่บังเนื้อหาบิล ----------
+// วิธีลบลูกเล่นนี้ทั้งหมดถ้าไม่ต้องการ: ลบ <ThemeFxStyle/>, <HeaderFx .../> ทุกจุดที่เรียกใช้
+// และลบฟังก์ชัน/ค่าคงที่ตั้งแต่ THEME_FX_CSS ถึง HeaderFx ออกจากไฟล์นี้ (หรือขอให้ผมลบให้ก็ได้)
+const THEME_FX_CSS = `
+@keyframes tfxBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes tfxSway{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+@keyframes tfxPatrolBig{
+  0%{transform:translateX(0) translateY(0) rotate(-3deg) scaleX(1)}
+  24%{transform:translateX(38vw) translateY(-10px) rotate(3deg) scaleX(1)}
+  49%{transform:translateX(78vw) translateY(0) rotate(-2deg) scaleX(1)}
+  50%{transform:translateX(78vw) translateY(0) rotate(-2deg) scaleX(-1)}
+  74%{transform:translateX(38vw) translateY(-10px) rotate(3deg) scaleX(-1)}
+  99%{transform:translateX(0) translateY(0) rotate(-3deg) scaleX(-1)}
+  100%{transform:translateX(0) translateY(0) rotate(-3deg) scaleX(1)}
+}
+@keyframes tfxPatrolSmall{0%,100%{transform:translateX(0) rotate(-4deg)}50%{transform:translateX(16vw) rotate(4deg)}}
+@keyframes tfxDrift{0%{transform:translateY(-10px) translateX(0);opacity:0}15%{opacity:.85}85%{opacity:.7}100%{transform:translateY(60px) translateX(var(--dx,0px));opacity:0}}
+@keyframes tfxRise{0%{transform:translateY(0) translateX(0) scale(.9);opacity:0}12%{opacity:.9}88%{opacity:.7}100%{transform:translateY(-70px) translateX(var(--dx,0px)) scale(1.05);opacity:0}}
+.tfx-header{position:relative;overflow:hidden}
+.tfx-particles{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+.tfx-particle{position:absolute;will-change:transform;opacity:0}
+.tfx-mascot{position:absolute;z-index:1;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3));animation:tfxBob 4.5s ease-in-out infinite;pointer-events:none}
+.tfx-mascot.sway{animation:tfxSway 4.5s ease-in-out infinite}
+.tfx-mascot.still{animation:none}
+.tfx-mascot.patrol{animation:tfxPatrolBig 20s ease-in-out infinite}
+.tfx-mascot.patrolsmall{animation:tfxPatrolSmall 11s ease-in-out infinite}
+`;
+function ThemeFxStyle() {
+  return <style>{THEME_FX_CSS}</style>;
+}
+function fxPickKind(kind) { return Array.isArray(kind) ? kind[Math.floor(Math.random() * kind.length)] : kind; }
+function fxDecorate(el, kind) {
+  if (kind === "droplet") el.textContent = "💧";
+  else if (kind === "splash") el.textContent = "💦";
+  else if (kind === "snow") { el.textContent = "❄"; el.style.color = "#fff"; }
+  else if (kind === "lantern") el.textContent = "🏮";
+  else if (kind === "bat") el.textContent = "🦇";
+  else if (kind === "spark") el.textContent = "✨";
+  else if (kind === "balloon") el.textContent = "🎈";
+  else if (kind === "petal") el.textContent = "🌸";
+  else if (kind === "redgold") { el.style.width = "6px"; el.style.height = "6px"; el.style.background = "#C9972F"; el.style.transform = "rotate(45deg)"; }
+  else if (kind === "glow") {
+    el.style.width = "8px"; el.style.height = "8px"; el.style.borderRadius = "50%";
+    el.style.background = "radial-gradient(circle, rgba(255,224,150,.95), rgba(255,224,150,0))";
+    el.style.boxShadow = "0 0 8px 2px rgba(255,210,120,.6)";
+  } else if (kind === "confetti") {
+    el.style.width = "5px"; el.style.height = "9px";
+    el.style.background = ["#C9A227", "#E2574C", "#8CC084", "#5CA0D3"][Math.floor(Math.random() * 4)];
+    el.style.borderRadius = "1px";
+  } else return false;
+  return true;
+}
+// แถบหัวแอป: ใส่มาสคอต + ประกายเคลื่อนไหวของธีม (อยู่ในกรอบแถบหัวเท่านั้น ไม่กระทบเนื้อหาด้านล่าง)
+function HeaderFx({ theme }) {
+  const ref = React.useRef(null);
+  useEffect(() => {
+    const kinds = theme.particle;
+    const el0 = ref.current;
+    if (!kinds || !el0) return;
+    const spawn = () => {
+      const kind = fxPickKind(kinds);
+      const el = document.createElement("div");
+      el.className = "tfx-particle";
+      el.style.left = (Math.random() * 92 + 2) + "%";
+      el.style.fontSize = (10 + Math.random() * 6) + "px";
+      el.style.setProperty("--dx", (Math.random() * 26 - 13) + "px");
+      if (kind === "lantern" || kind === "balloon" || kind === "glow") {
+        el.style.top = "88%";
+        el.style.animation = `tfxRise ${(3 + Math.random() * 1.5).toFixed(1)}s linear forwards`;
+      } else {
+        el.style.top = "-10px";
+        el.style.animation = `tfxDrift ${(2.6 + Math.random() * 1.4).toFixed(1)}s linear forwards`;
+      }
+      if (!fxDecorate(el, kind)) return;
+      el0.appendChild(el);
+      setTimeout(() => el.remove(), 5000);
+    };
+    for (let i = 0; i < 4; i++) setTimeout(spawn, i * 220);
+    const t = setInterval(spawn, 600);
+    return () => { clearInterval(t); if (el0) el0.innerHTML = ""; };
+  }, [theme]);
+
+  return (
+    <>
+      {(theme.scene || []).map((item, i) => {
+        const cls = { sway: "sway", still: "still", patrol: "patrol", patrolsmall: "patrolsmall" }[item.anim] || "";
+        return (
+          <div key={i} className={"tfx-mascot" + (cls ? " " + cls : "")}
+            style={{ left: item.left + "%", top: item.top + "%", fontSize: item.size, animationDelay: item.delay ? item.delay + "s" : undefined }}>
+            {item.e}
+          </div>
+        );
+      })}
+      <div ref={ref} className="tfx-particles" />
+    </>
+  );
+}
+
 const MONTHS_TH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 // รหัส ID ของผู้ใช้แต่ละคน (เช่น "1a", "landlord") จะถูกแปลงเป็นอีเมลปลอมด้วยโดเมนนี้
 // เพื่อให้ใช้กับระบบ auth ของ Supabase ได้โดยไม่ต้องมีอีเมลจริง
@@ -488,14 +719,17 @@ function LoginScreen({ property }) {
     else localStorage.removeItem("baanchao_last_id");
   };
 
+  const theme = getTheme(property);
   return (
-    <div className="min-h-screen w-full flex items-center justify-center px-5" style={{ background: C.navy }}>
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen w-full flex items-center justify-center px-5 tfx-header" style={{ background: theme.headerBg }}>
+      <ThemeFxStyle />
+      <HeaderFx theme={theme} />
+      <div className="w-full max-w-sm" style={{ position: "relative", zIndex: 2 }}>
         <div className="flex flex-col items-center mb-6 text-white">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 overflow-hidden" style={{ background: "rgba(255,255,255,0.12)" }}>
             {property?.logo_url ? <img src={property.logo_url} alt="logo" className="w-full h-full object-cover" /> : <Home size={22} />}
           </div>
-          <h1 className="text-xl font-bold" style={display}>บ้านเช่า</h1>
+          <h1 className="text-xl font-bold" style={display}>{theme.emoji ? `${theme.emoji} ` : ""}บ้านเช่า</h1>
           <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.65)" }}>{property?.name || "กำลังโหลด..."}</p>
         </div>
         <form onSubmit={handleSubmit} className="rounded-2xl p-5" style={{ background: C.card }}>
@@ -535,7 +769,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [rentDraft, setRentDraft] = useState("");
   const [photoDraft, setPhotoDraft] = useState("");
   const [rateDraft, setRateDraft] = useState({ water: rates?.water_rate || 18, electric: rates?.electric_rate || 8 });
-  const [propDraft, setPropDraft] = useState({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "" });
+  const [propDraft, setPropDraft] = useState({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "", theme: property?.theme || "default" });
   const [addForm, setAddForm] = useState({ label: "", tenantId: "", rent: "", prevWater: "0", prevElectric: "0" });
   const [addError, setAddError] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
@@ -676,7 +910,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const saveRates = async () => {
     setBusy(true);
     await supabase.from("rates").update({ water_rate: Number(rateDraft.water), electric_rate: Number(rateDraft.electric) }).eq("id", 1);
-    await supabase.from("property_settings").update({ name: propDraft.name, logo_url: propDraft.logo_url, payment_qr_url: propDraft.payment_qr_url }).eq("id", 1);
+    await supabase.from("property_settings").update({ name: propDraft.name, logo_url: propDraft.logo_url, payment_qr_url: propDraft.payment_qr_url, theme: propDraft.theme }).eq("id", 1);
     setBusy(false); setShowSettings(false); onRefresh();
   };
   const markCashPaid = async () => {
@@ -719,7 +953,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
           <button onClick={() => setShowAddRoom(true)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white" style={{ background: C.navy }}>
             <Plus size={16} /> เพิ่มห้อง
           </button>
-          <button onClick={() => { setPropDraft({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "" }); setRateDraft({ water: rates?.water_rate, electric: rates?.electric_rate }); setShowSettings(true); }}
+          <button onClick={() => { setPropDraft({ name: property?.name || "", logo_url: property?.logo_url || "", payment_qr_url: property?.payment_qr_url || "", theme: property?.theme || "default" }); setRateDraft({ water: rates?.water_rate, electric: rates?.electric_rate }); setShowSettings(true); }}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium" style={{ background: C.card, border: `1px solid ${C.line}`, color: C.navy }}>
             <Settings size={16} /> ตั้งค่า
           </button>
@@ -807,6 +1041,22 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
             </div>
             <p className="text-[11px] -mt-2 mb-3" style={{ color: C.inkSoft }}>
               อัปโหลดรูป QR พร้อมเพย์จริงของคุณ (จากแอปธนาคาร) ไว้ที่อื่นก่อน เช่น Imgur แล้ววางลิงก์รูปตรงนี้ ผู้เช่าจะสแกนแล้วโอนเงินเข้าบัญชีคุณโดยตรง
+            </p>
+            <div className="h-px my-3" style={{ background: C.line }} />
+            <label className="text-xs font-medium" style={{ color: C.inkSoft }}>ธีมตามเทศกาล (เปลี่ยนสีหัวแอปทั้งระบบ)</label>
+            <select value={propDraft.theme} onChange={(e) => setPropDraft({ ...propDraft, theme: e.target.value })}
+              className="w-full mt-1 mb-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}` }}>
+              <option value="auto">🪄 อัตโนมัติ (เปลี่ยนตามวันสำคัญให้เอง)</option>
+              {["เริ่มต้น", "เทศกาลรื่นเริง", "วันสำคัญทางพุทธศาสนา", "วันสำคัญของชาติ"].map((cat) => (
+                <optgroup key={cat} label={cat}>
+                  {Object.entries(THEMES).filter(([, t]) => t.category === cat).map(([key, t]) => (
+                    <option key={key} value={key}>{t.emoji ? `${t.emoji} ` : ""}{t.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <p className="text-[11px] -mt-1 mb-3" style={{ color: C.inkSoft }}>
+              เลือก "อัตโนมัติ" ให้ระบบเปลี่ยนธีมตามวันสำคัญเอง (ขึ้นก่อนวันจริง 7 วัน และอยู่ต่ออีก 7 วัน) หรือเลือกธีมเองตายตัวก็ได้ เลือกแล้วกด "บันทึก" ด้านล่าง เปลี่ยนกลับเป็น "ปกติ" ได้ตลอดเวลา
             </p>
             <div className="h-px my-3" style={{ background: C.line }} />
             <p className="text-xs font-semibold mb-2" style={{ color: C.inkSoft }}>อัตราค่าน้ำไฟ (ทุกห้อง)</p>
@@ -1675,17 +1925,21 @@ export default function App() {
 
   const myRoom = rooms[0];
   const myCycle = myRoom ? cyclesByRoom[myRoom.id] : null;
+  const theme = getTheme(property);
+  const themeKey = resolveThemeKey(property);
 
   return (
     <div className="min-h-screen w-full" style={{ background: C.paper, fontFamily: "'Inter', sans-serif" }}>
-      <div className="sticky top-0 z-10 flex items-center justify-between px-5 md:px-8 py-3" style={{ background: C.navy }}>
-        <div className="flex items-center gap-2 text-white">
+      <div className="sticky top-0 z-10 flex items-center justify-between px-5 md:px-8 py-3 tfx-header" style={{ background: theme.headerBg }}>
+        <ThemeFxStyle />
+        <HeaderFx theme={theme} />
+        <div className="flex items-center gap-2 text-white" style={{ position: "relative", zIndex: 2 }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden shrink-0" style={{ background: "rgba(255,255,255,0.14)" }}>
             {property?.logo_url ? <img src={property.logo_url} alt="logo" className="w-full h-full object-cover" /> : <Home size={16} />}
           </div>
-          <span className="font-semibold text-sm" style={display}>{property?.name}</span>
+          <span className="font-semibold text-sm" style={display}>{theme.emoji ? `${theme.emoji} ` : ""}{property?.name}</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ position: "relative", zIndex: 2 }}>
           <span className="text-xs text-white hidden sm:inline" style={{ opacity: 0.8 }}>{profile.full_name}</span>
           <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full text-white" style={{ background: "rgba(255,255,255,0.14)" }}>
             <LogOut size={13} /> ออกจากระบบ
@@ -1693,13 +1947,20 @@ export default function App() {
         </div>
       </div>
 
+      {theme && themeKey !== "default" && theme.fact && (
+        <div className="px-5 md:px-8 py-2.5 text-xs flex items-start gap-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}`, color: C.inkSoft, borderLeft: `3px solid ${theme.accent}` }}>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>💡</span>
+          <span><b style={{ color: C.ink }}>รู้หรือไม่?</b> {theme.fact}</span>
+        </div>
+      )}
+
       <div className="flex justify-center gap-2 py-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}` }}>
-        <button onClick={() => setView("bills")} className="px-4 py-1.5 rounded-full text-xs font-semibold" style={{ background: view === "bills" ? C.navy : C.paper, color: view === "bills" ? "#fff" : C.inkSoft }}>บิล</button>
-        <button onClick={() => setView("shop")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "shop" ? C.navy : C.paper, color: view === "shop" ? "#fff" : C.inkSoft }}><ShoppingCart size={13} /> ร้านค้า</button>
+        <button onClick={() => setView("bills")} className="px-4 py-1.5 rounded-full text-xs font-semibold" style={{ background: view === "bills" ? theme.accent : C.paper, color: view === "bills" ? "#fff" : C.inkSoft }}>บิล</button>
+        <button onClick={() => setView("shop")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "shop" ? theme.accent : C.paper, color: view === "shop" ? "#fff" : C.inkSoft }}><ShoppingCart size={13} /> ร้านค้า</button>
         {profile.role === "tenant" && (
-          <button onClick={() => setView("profile")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "profile" ? C.navy : C.paper, color: view === "profile" ? "#fff" : C.inkSoft }}><User size={13} /> โปรไฟล์</button>
+          <button onClick={() => setView("profile")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "profile" ? theme.accent : C.paper, color: view === "profile" ? "#fff" : C.inkSoft }}><User size={13} /> โปรไฟล์</button>
         )}
-        <button onClick={() => setView("rules")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "rules" ? C.navy : C.paper, color: view === "rules" ? "#fff" : C.inkSoft }}><FileText size={13} /> กฎการเช่า</button>
+        <button onClick={() => setView("rules")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "rules" ? theme.accent : C.paper, color: view === "rules" ? "#fff" : C.inkSoft }}><FileText size={13} /> กฎการเช่า</button>
       </div>
 
       {view === "bills" ? (
