@@ -1,0 +1,815 @@
+<title>ธีมเทศกาล บ้านเช่า</title>
+<style>
+  /*
+    layout: one large centered phone mockup + pill theme-switcher below it;
+    an ambient color wash + floating particles fill the page behind the phone
+    color: 6 token sets (one per theme), swapped via [data-active] on <body>
+    type: Kanit (display, Thai-forward geometric) + Sarabun (body/numbers)
+  */
+  :root{
+    --page-bg:#121018;
+    --page-fg:#F2EFE8;
+    --muted:#9C94A8;
+    --phone-bg:#1B1924;
+    --card:#242230;
+    --card-line:#34303F;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--page-bg);
+    color:var(--page-fg);
+    font-family:'Sarabun','IBM Plex Sans Thai',system-ui,sans-serif;
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:32px 16px calc(48px + env(safe-area-inset-bottom, 0px));
+    overflow-x:hidden;
+    position:relative;
+    transition:background 700ms ease;
+  }
+
+  .ambient{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+    background:radial-gradient(60% 50% at 50% 18%, var(--glow) 0%, transparent 70%);
+    opacity:.55;
+    transition:background 700ms ease;
+  }
+  #particles{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+  .particle{position:absolute;will-change:transform;opacity:0}
+
+  header.top{
+    position:relative;z-index:2;
+    text-align:center;
+    margin-bottom:22px;
+    max-width:60ch;
+  }
+  header.top h1{
+    font-family:'Kanit',system-ui,sans-serif;
+    font-weight:700;
+    font-size:clamp(22px,4vw,30px);
+    margin:0 0 6px;
+    text-wrap:balance;
+  }
+  header.top p{
+    margin:0;
+    color:var(--muted);
+    font-size:13.5px;
+    line-height:1.7;
+  }
+
+  /* ---------- stage (big illustrated backdrop behind the phone) ---------- */
+  .stage{
+    position:relative;z-index:1;
+    width:min(760px, 94vw);
+    height:300px;
+    border-radius:28px;
+    overflow:hidden;
+    margin:0 0 -90px;
+    background:var(--sky);
+    box-shadow:0 0 0 1px rgba(255,255,255,.06) inset;
+    transition:background 700ms ease;
+  }
+  .stage .ground{
+    position:absolute;left:0;right:0;bottom:0;height:38%;
+    background:var(--ground);
+    clip-path:polygon(0 38%,8% 30%,20% 40%,33% 22%,47% 36%,60% 18%,74% 32%,88% 20%,100% 34%,100% 100%,0 100%);
+    transition:background 700ms ease;
+  }
+  .stage .moon{
+    position:absolute;top:26px;right:48px;width:46px;height:46px;border-radius:50%;
+    background:#F3EAC9;box-shadow:0 0 34px 10px rgba(243,234,201,.45);
+    opacity:0;transition:opacity 700ms ease;
+  }
+  .stage .sun{
+    position:absolute;top:26px;right:48px;width:50px;height:50px;border-radius:50%;
+    background:#FFE27A;box-shadow:0 0 40px 14px rgba(255,226,122,.5);
+    opacity:0;transition:opacity 700ms ease;
+  }
+  .stage .stars{position:absolute;inset:0;opacity:0;transition:opacity 700ms ease}
+  .stage .stars span{
+    position:absolute;width:3px;height:3px;background:#fff;border-radius:50%;
+    animation:twinkle 2.6s ease-in-out infinite;
+  }
+  .scene-item{
+    position:absolute;
+    font-size:40px;
+    line-height:1;
+    filter:drop-shadow(0 10px 14px rgba(0,0,0,.35));
+    animation:bob 4.5s ease-in-out infinite;
+  }
+  .scene-item.sway{animation:sway 4.5s ease-in-out infinite}
+  .scene-item.still{animation:none}
+
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  @keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+  @keyframes twinkle{0%,100%{opacity:.25}50%{opacity:1}}
+
+  /* ---------- phone mockup ---------- */
+  .device-wrap{position:relative;z-index:2;margin:6px 0 26px}
+  .device{
+    width:min(340px, 86vw);
+    border-radius:42px;
+    background:linear-gradient(160deg,#2a2735,#121018);
+    padding:12px;
+    box-shadow:
+      0 30px 60px -20px rgba(0,0,0,.6),
+      0 0 0 1px rgba(255,255,255,.06) inset;
+    transition:box-shadow 700ms ease;
+  }
+  .screen{
+    position:relative;
+    background:var(--phone-bg);
+    border-radius:32px;
+    overflow:hidden;
+    min-height:600px;
+    display:flex;
+    flex-direction:column;
+    transition:background 700ms ease;
+  }
+  .notch{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:120px;height:22px;background:#000;border-radius:0 0 16px 16px;
+    z-index:5;
+  }
+  .statusbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 22px 2px;
+    font-size:12px;font-weight:600;color:#fff;
+    position:relative;z-index:2;
+  }
+  .statusbar .dots{display:flex;gap:3px;align-items:center}
+  .statusbar .dots span{width:4px;height:4px;border-radius:50%;background:#fff}
+
+  .app-header{
+    position:relative;z-index:2;
+    padding:18px 22px 24px;
+    background:var(--grad);
+    color:#fff;
+    transition:background 700ms ease;
+  }
+  .app-header .brand{
+    display:flex;align-items:center;gap:8px;
+    font-family:'Kanit';font-weight:600;font-size:14px;
+    opacity:.92;margin-bottom:18px;
+  }
+  .app-header .brand .emoji{font-size:16px}
+  .app-header .room{font-size:12.5px;opacity:.78;margin-bottom:4px}
+  .app-header .amount{
+    font-family:'Kanit';font-weight:700;
+    font-size:34px;line-height:1.1;
+    font-variant-numeric:tabular-nums;
+    margin-bottom:4px;
+  }
+  .app-header .amount small{font-size:16px;font-weight:500;opacity:.85;margin-right:4px}
+  .app-header .due{font-size:12px;opacity:.82}
+
+  .app-body{
+    flex:1;
+    position:relative;z-index:2;
+    padding:16px 18px 10px;
+    display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;
+  }
+  .fact-card{
+    background:color-mix(in srgb, var(--accent) 16%, var(--card));
+    border:1px solid color-mix(in srgb, var(--accent) 38%, var(--card-line));
+    border-radius:14px;
+    padding:11px 13px;
+    display:flex;gap:9px;align-items:flex-start;
+    transition:background 700ms ease, border-color 700ms ease;
+  }
+  .fact-card .ic{font-size:16px;line-height:1.3;flex:none}
+  .fact-card .tx b{
+    display:block;font-size:10.5px;letter-spacing:.03em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:3px;font-weight:700;
+  }
+  .fact-card .tx p{margin:0;font-size:12px;line-height:1.55}
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-line);
+    border-radius:16px;
+    padding:13px 14px;
+    display:flex;align-items:center;gap:11px;
+  }
+  .card .ic{
+    width:34px;height:34px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;flex:none;
+    background:color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .card .tx b{display:block;font-size:13px;font-weight:600}
+  .card .tx span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+  .card.cta{
+    margin-top:4px;
+    background:var(--accent);
+    border:none;color:#fff;
+    justify-content:center;
+    font-family:'Kanit';font-weight:600;font-size:13.5px;
+    transition:background 700ms ease;
+  }
+
+  .tabbar{
+    position:relative;z-index:2;
+    display:flex;gap:4px;
+    padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px));
+    border-top:1px solid var(--card-line);
+    background:var(--phone-bg);
+    transition:background 700ms ease;
+  }
+  .tabbar .tab{
+    flex:1;min-width:0;text-align:center;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:6px 2px 7px;border-radius:12px;
+    font-size:10.5px;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .tabbar .tab .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:0}
+  .tabbar .tab.active{
+    color:#fff;background:var(--accent);
+    font-weight:700;
+    transition:background 700ms ease;
+  }
+
+  /* ---------- switcher ---------- */
+  .switcher{
+    position:relative;z-index:2;
+    display:flex;flex-direction:column;
+    gap:14px;align-items:center;
+    max-width:640px;
+  }
+  .switcher .group-label{
+    font-family:'Kanit';font-weight:600;font-size:12.5px;
+    color:var(--muted);letter-spacing:.02em;
+    margin-bottom:-6px;
+  }
+  .switcher .group-row{
+    display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+  }
+  .switcher button{
+    font-family:'Sarabun';
+    display:flex;align-items:center;gap:7px;
+    padding:9px 16px 9px 12px;
+    border-radius:999px;
+    border:1px solid var(--card-line);
+    background:var(--card);
+    color:var(--page-fg);
+    font-size:13px;font-weight:600;
+    cursor:pointer;
+    transition:transform 150ms ease, border-color 200ms ease, background 200ms ease;
+  }
+  .switcher button .sw-emoji{font-size:15px}
+  .switcher button:hover{transform:translateY(-1px)}
+  .switcher button.active{
+    border-color:var(--accent);
+    background:color-mix(in srgb, var(--accent) 20%, var(--card));
+  }
+
+  footer.hint{
+    position:relative;z-index:2;
+    margin-top:22px;font-size:12px;color:var(--muted);text-align:center;
+  }
+  footer.hint code{
+    background:var(--card);border:1px solid var(--card-line);
+    border-radius:5px;padding:1px 6px;font-size:11.5px;
+  }
+
+  @keyframes drift{
+    0%{transform:translateY(-10vh) translateX(0) rotate(0deg);opacity:0}
+    8%{opacity:.9}
+    92%{opacity:.85}
+    100%{transform:translateY(110vh) translateX(var(--dx,0px)) rotate(var(--rot,0deg));opacity:0}
+  }
+  @keyframes rise{
+    0%{transform:translateY(10vh) translateX(0) scale(.9);opacity:0}
+    10%{opacity:.95}
+    90%{opacity:.8}
+    100%{transform:translateY(-105vh) translateX(var(--dx,0px)) scale(1.05);opacity:0}
+  }
+  @keyframes pulse{
+    0%,100%{opacity:.55;transform:scale(1)}
+    50%{opacity:1;transform:scale(1.12)}
+  }
+
+  @media (max-width:420px){
+    .screen{min-height:560px}
+  }
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<div class="ambient" id="ambient"></div>
+<div id="particles"></div>
+
+<header class="top">
+  <h1>ลองดูธีมและวันสำคัญของ บ้านเช่า</h1>
+  <p>แตะเลือกจากกลุ่มด้านล่างเพื่อดูตัวอย่างหน้าแอปแบบเต็มๆ — สีหัวแอป ฉากประกอบ และแท็บจะเปลี่ยนตามจริง พร้อมเกร็ดความรู้สั้นๆ ใต้หัวแอปในทุกธีม</p>
+</header>
+
+<div class="stage" id="stage">
+  <div class="moon" id="moon"></div>
+  <div class="sun" id="sun"></div>
+  <div class="stars" id="stars"></div>
+  <div class="ground" id="ground"></div>
+  <div id="sceneItems"></div>
+</div>
+
+<div class="device-wrap">
+  <div class="device">
+    <div class="screen" id="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span id="clock">21:42</span>
+        <span class="dots"><span></span><span></span><span></span></span>
+      </div>
+
+      <div class="app-header" id="appHeader">
+        <div class="brand"><span class="emoji" id="brandEmoji"></span><span id="brandText">บ้านเช่า</span></div>
+        <div class="room">ห้อง มีสุข3</div>
+        <div class="amount"><small>฿</small>3,540</div>
+        <div class="due">ครบกำหนดชำระ 5 พ.ย. 2569</div>
+      </div>
+
+      <div class="app-body">
+        <div class="fact-card" id="factCard">
+          <div class="ic">💡</div>
+          <div class="tx"><b>รู้หรือไม่</b><p id="factText">—</p></div>
+        </div>
+        <div class="card">
+          <div class="ic">💧</div>
+          <div class="tx"><b>ค่าน้ำ</b><span>18 หน่วย · 126 บาท</span></div>
+        </div>
+        <div class="card">
+          <div class="ic">⚡</div>
+          <div class="tx"><b>ค่าไฟ</b><span>142 หน่วย · 994 บาท</span></div>
+        </div>
+        <div class="card">
+          <div class="ic">🏠</div>
+          <div class="tx"><b>ค่าเช่าห้อง</b><span>รายเดือน · 2,420 บาท</span></div>
+        </div>
+        <div class="card cta" id="ctaCard">ชำระผ่าน QR พร้อมเพย์</div>
+      </div>
+
+      <div class="tabbar" id="tabbar">
+        <div class="tab active" id="tab0"><span>บิล</span></div>
+        <div class="tab"><span>ร้านค้า</span></div>
+        <div class="tab"><span>โปรไฟล์</span></div>
+        <div class="tab"><span>กฎการเช่า</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="switcher" id="switcher"></div>
+
+<footer class="hint">เปลี่ยนธีมจริงได้จากหน้าตั้งค่าของเจ้าของบ้าน (<code>property_settings.theme</code>) ไม่ต้องอัปโหลดโค้ดใหม่</footer>
+
+<script>
+  const THEMES = {
+    default: {
+      label:"ปกติ", emoji:"", category:"เริ่มต้น", grad:"linear-gradient(135deg,#223955,#16263B)",
+      accent:"#2F4E72", glow:"#2F4E72", phone:"#17151F", card:"#201E29",
+      sky:"linear-gradient(180deg,#8FB9D8,#DDE9EC)", ground:"#6FA06B",
+      mode:"day",
+      fact:"เลือกธีมเทศกาลหรือวันสำคัญได้จากหน้าตั้งค่าของเจ้าของบ้าน แอปจะเปลี่ยนสีและใส่เกร็ดความรู้ให้อัตโนมัติ ไม่ต้องอัปโหลดโค้ดใหม่",
+      scene:[
+        {e:"🏠",left:14,bottom:6,size:56,anim:"still"},
+        {e:"🌳",left:30,bottom:2,size:40,anim:"sway"},
+        {e:"🌳",left:72,bottom:0,size:34,anim:"sway",delay:.6},
+        {e:"☁️",left:8,bottom:62,size:30,anim:"bob",delay:.2},
+        {e:"☁️",left:82,bottom:68,size:26,anim:"bob",delay:.8},
+      ],
+    },
+    songkran: {
+      label:"สงกรานต์", emoji:"💦", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#2AA7D8,#0E6FA8)",
+      accent:"#1E6FA8", glow:"#2AA7D8", phone:"#0E1E2B", card:"#13293B", particle:"droplet",
+      sky:"linear-gradient(180deg,#58C4EE,#C9EEFB)", ground:"#3FA6C2",
+      mode:"day",
+      fact:"สงกรานต์คือวันขึ้นปีใหม่ไทยแบบดั้งเดิม เดิมเน้นการสรงน้ำพระและรดน้ำขอพรผู้ใหญ่ ก่อนจะกลายเป็นเทศกาลสาดน้ำที่รู้จักกันทั่วโลก",
+      scene:[
+        {e:"🐘",left:10,bottom:2,size:62,anim:"bob"},
+        {e:"🚚",left:68,bottom:0,size:52,anim:"still"},
+        {e:"🌺",left:30,bottom:4,size:28,anim:"sway",delay:.3},
+        {e:"🌺",left:88,bottom:8,size:24,anim:"sway",delay:.9},
+        {e:"☁️",left:6,bottom:66,size:28,anim:"bob",delay:.4},
+        {e:"☁️",left:78,bottom:70,size:24,anim:"bob",delay:1},
+      ],
+    },
+    loykrathong: {
+      label:"ลอยกระทง", emoji:"🏮", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#4A3B73,#241C3C)",
+      accent:"#C9972F", glow:"#8A6A2E", phone:"#1A1530", card:"#241C3C", particle:"lantern",
+      sky:"linear-gradient(180deg,#241A3D,#4B3A6B)", ground:"#1B2B44",
+      mode:"night",
+      fact:"ลอยกระทงจัดขึ้นคืนวันเพ็ญเดือน 12 เพื่อขอขมาและแสดงความกตัญญูต่อพระแม่คงคา เชื่อกันว่าเป็นการลอยทิ้งสิ่งไม่ดีไปกับสายน้ำ",
+      scene:[
+        {e:"🏮",left:12,bottom:58,size:34,anim:"sway"},
+        {e:"🏮",left:26,bottom:72,size:26,anim:"sway",delay:.5},
+        {e:"🏮",left:85,bottom:62,size:30,anim:"sway",delay:.9},
+        {e:"🪷",left:36,bottom:4,size:30,anim:"bob",delay:.2},
+        {e:"🪷",left:56,bottom:2,size:26,anim:"bob",delay:.7},
+        {e:"🛶",left:68,bottom:3,size:40,anim:"bob",delay:.3},
+      ],
+    },
+    newyear: {
+      label:"ปีใหม่", emoji:"🎉", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#9C2C3B,#5A1620)",
+      accent:"#C9A227", glow:"#C9A227", phone:"#241319", card:"#301A21", particle:"confetti",
+      sky:"linear-gradient(180deg,#1C1030,#3C1B33)", ground:"#241225",
+      mode:"night",
+      fact:"ไทยเริ่มใช้วันที่ 1 มกราคม เป็นวันขึ้นปีใหม่สากลอย่างเป็นทางการตั้งแต่ปี พ.ศ. 2484 แทนวันขึ้นปีใหม่เดิมคือ 1 เมษายน",
+      scene:[
+        {e:"🎆",left:14,bottom:50,size:46,anim:"still"},
+        {e:"🎇",left:78,bottom:60,size:38,anim:"still",delay:.4},
+        {e:"🥂",left:34,bottom:2,size:34,anim:"bob",delay:.2},
+        {e:"🎊",left:58,bottom:4,size:30,anim:"sway",delay:.6},
+        {e:"🕛",left:86,bottom:4,size:28,anim:"bob",delay:.8},
+      ],
+    },
+    christmas: {
+      label:"คริสต์มาส", emoji:"🎄", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#2E7D52,#17432B)",
+      accent:"#B5292F", glow:"#2E7D52", phone:"#101E16", card:"#17291E", particle:"snow",
+      sky:"linear-gradient(180deg,#152A3A,#2E4C5C)", ground:"#EAF3F7",
+      mode:"night",
+      fact:"วันคริสต์มาสระลึกถึงการประสูติของพระเยซู เป็นเทศกาลสำคัญของชาวคริสต์ทั่วโลก ส่วนในไทยนิยมฉลองกันทั่วไปแบบไม่เน้นศาสนา",
+      scene:[
+        {e:"🎄",left:12,bottom:2,size:64,anim:"sway"},
+        {e:"🏠",left:76,bottom:0,size:48,anim:"still",delay:.2},
+        {e:"🎅",left:36,bottom:2,size:40,anim:"bob",delay:.3},
+        {e:"🦌",left:52,bottom:0,size:34,anim:"bob",delay:.5},
+        {e:"🦌",left:64,bottom:0,size:30,anim:"bob",delay:.8},
+        {e:"⛄",left:88,bottom:2,size:32,anim:"still",delay:.1},
+      ],
+    },
+    halloween: {
+      label:"ฮาโลวีน", emoji:"🎃", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#5C3B8A,#2B2130)",
+      accent:"#D97A2A", glow:"#6B3FA0", phone:"#19121F", card:"#241A2E", particle:"bat",
+      sky:"linear-gradient(180deg,#2B1E42,#5A3A66)", ground:"#241A2E",
+      mode:"night",
+      fact:"ฮาโลวีนมีต้นกำเนิดจากเทศกาลเคลติกโบราณ เชื่อว่าเป็นคืนที่เส้นแบ่งระหว่างโลกมนุษย์กับโลกวิญญาณบางที่สุดในรอบปี",
+      scene:[
+        {e:"🎃",left:14,bottom:2,size:40,anim:"still"},
+        {e:"🎃",left:26,bottom:0,size:30,anim:"still",delay:.3},
+        {e:"👻",left:62,bottom:30,size:38,anim:"bob",delay:.4},
+        {e:"🕸️",left:4,bottom:68,size:40,anim:"still"},
+        {e:"🧙",left:80,bottom:2,size:44,anim:"bob",delay:.6},
+      ],
+    },
+    chinesenewyear: {
+      label:"ตรุษจีน", emoji:"🧧", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#B5272D,#7A1620)",
+      accent:"#C9972F", glow:"#B5272D", phone:"#241315", card:"#30191B", particle:"redgold",
+      sky:"linear-gradient(180deg,#7A1620,#B5272D)", ground:"#241315",
+      mode:"night",
+      fact:"ตรุษจีนคือวันขึ้นปีใหม่ตามปฏิทินจันทรคติจีน ครอบครัวจะไหว้บรรพบุรุษและแจกอั่งเปาสีแดง-ทอง เพื่อความเป็นสิริมงคล",
+      scene:[
+        {e:"🏮",left:10,bottom:58,size:32,anim:"sway"},
+        {e:"🏮",left:86,bottom:60,size:30,anim:"sway",delay:.5},
+        {e:"🐉",left:40,bottom:2,size:58,anim:"bob",delay:.2},
+        {e:"🧧",left:70,bottom:4,size:30,anim:"sway",delay:.4},
+      ],
+    },
+    midautumn: {
+      label:"ไหว้พระจันทร์", emoji:"🎑", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#2B3A6B,#14204A)",
+      accent:"#C9A227", glow:"#2B3A6B", phone:"#111A33", card:"#1B2648", particle:"lantern",
+      sky:"linear-gradient(180deg,#0E1733,#243764)", ground:"#141F3F",
+      mode:"night",
+      fact:"เทศกาลไหว้พระจันทร์จัดคืนวันเพ็ญเดือน 8 ตามจันทรคติจีน เพื่อขอบคุณพระจันทร์และความอุดมสมบูรณ์ สัญลักษณ์คือขนมไหว้พระจันทร์และกระต่าย",
+      scene:[
+        {e:"🎑",left:60,bottom:55,size:50,anim:"still"},
+        {e:"🐇",left:30,bottom:2,size:34,anim:"bob",delay:.3},
+        {e:"🥮",left:14,bottom:4,size:30,anim:"bob",delay:.6},
+        {e:"🏮",left:84,bottom:10,size:28,anim:"sway",delay:.4},
+      ],
+    },
+    vegetarian: {
+      label:"กินเจ", emoji:"🟡", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#C9A227,#8A6A1E)",
+      accent:"#C9A227", glow:"#C9A227", phone:"#201C10", card:"#2B2516", particle:"none",
+      sky:"linear-gradient(180deg,#F4E6B8,#C9A227)", ground:"#8A6A1E",
+      mode:"day",
+      fact:"เทศกาลกินเจกินเวลา 9 วัน ผู้ร่วมงานละเว้นเนื้อสัตว์เพื่อชำระกายใจให้บริสุทธิ์ นิยมมากในภาคใต้ โดยเฉพาะที่จังหวัดภูเก็ต",
+      scene:[
+        {e:"🚩",left:14,bottom:10,size:36,anim:"sway"},
+        {e:"🚩",left:82,bottom:12,size:32,anim:"sway",delay:.4},
+        {e:"🥬",left:32,bottom:2,size:30,anim:"bob",delay:.2},
+        {e:"🕯️",left:58,bottom:4,size:28,anim:"still",delay:.6},
+      ],
+    },
+    makhabucha: {
+      label:"มาฆบูชา", emoji:"🪷", category:"วันสำคัญทางพุทธศาสนา", grad:"linear-gradient(135deg,#4A3B2A,#8A6A2E)",
+      accent:"#C9972F", glow:"#8A6A2E", phone:"#1A160F", card:"#241F15", particle:"petal",
+      sky:"linear-gradient(180deg,#1A1D33,#3A3250)", ground:"#241F15",
+      mode:"night",
+      fact:"วันมาฆบูชาระลึกถึงวันที่พระพุทธเจ้าทรงแสดง “โอวาทปาฏิโมกข์” แก่พระอรหันต์ 1,250 องค์ ที่มาประชุมพร้อมกันโดยมิได้นัดหมาย",
+      scene:[
+        {e:"🛕",left:50,bottom:0,size:58,anim:"still"},
+        {e:"🪷",left:20,bottom:2,size:30,anim:"bob",delay:.3},
+        {e:"🪷",left:76,bottom:4,size:26,anim:"bob",delay:.7},
+        {e:"🕯️",left:34,bottom:4,size:24,anim:"still",delay:.1},
+      ],
+    },
+    visakhabucha: {
+      label:"วิสาขบูชา", emoji:"🪷", category:"วันสำคัญทางพุทธศาสนา", grad:"linear-gradient(135deg,#4A3B2A,#8A6A2E)",
+      accent:"#C9972F", glow:"#8A6A2E", phone:"#1A160F", card:"#241F15", particle:"petal",
+      sky:"linear-gradient(180deg,#1A1D33,#3A3250)", ground:"#241F15",
+      mode:"night",
+      fact:"วันวิสาขบูชาเป็นวันประสูติ ตรัสรู้ และปรินิพพานของพระพุทธเจ้า ตรงกันทั้งสามเหตุการณ์ในวันเดียว องค์การสหประชาชาติยกให้เป็นวันสำคัญของโลก",
+      scene:[
+        {e:"🌳",left:18,bottom:0,size:60,anim:"sway"},
+        {e:"🛕",left:58,bottom:0,size:50,anim:"still",delay:.2},
+        {e:"🪷",left:38,bottom:2,size:26,anim:"bob",delay:.4},
+        {e:"🕯️",left:80,bottom:4,size:24,anim:"still",delay:.6},
+      ],
+    },
+    asalhabucha: {
+      label:"อาสาฬหบูชา", emoji:"🪷", category:"วันสำคัญทางพุทธศาสนา", grad:"linear-gradient(135deg,#4A3B2A,#8A6A2E)",
+      accent:"#C9972F", glow:"#8A6A2E", phone:"#1A160F", card:"#241F15", particle:"petal",
+      sky:"linear-gradient(180deg,#1A1D33,#3A3250)", ground:"#241F15",
+      mode:"night",
+      fact:"วันอาสาฬหบูชาระลึกถึงการแสดงปฐมเทศนาครั้งแรกของพระพุทธเจ้า คือ “ธัมมจักกัปปวัตนสูตร” นับเป็นวันที่เกิดพระสงฆ์องค์แรกในพระพุทธศาสนา",
+      scene:[
+        {e:"🛕",left:50,bottom:0,size:58,anim:"still"},
+        {e:"🪷",left:22,bottom:2,size:28,anim:"bob",delay:.3},
+        {e:"🕯️",left:76,bottom:4,size:26,anim:"still",delay:.5},
+      ],
+    },
+    khaophansa: {
+      label:"เข้าพรรษา", emoji:"🕯️", category:"วันสำคัญทางพุทธศาสนา", grad:"linear-gradient(135deg,#3A4A3A,#1E2E1E)",
+      accent:"#8A6A2E", glow:"#3A4A3A", phone:"#141F14", card:"#1E2A1E", particle:"petal",
+      sky:"linear-gradient(180deg,#5C6B66,#8B9B92)", ground:"#3A4A3A",
+      mode:"day",
+      fact:"วันเข้าพรรษาคือวันที่พระสงฆ์เริ่มจำพรรษาอยู่ ณ วัดใดวัดหนึ่งตลอด 3 เดือนในฤดูฝน เป็นที่มาของประเพณีถวายเทียนพรรษาที่สืบทอดมานาน",
+      scene:[
+        {e:"🛕",left:58,bottom:0,size:54,anim:"still"},
+        {e:"🕯️",left:30,bottom:2,size:46,anim:"still",delay:.2},
+        {e:"🌧️",left:12,bottom:60,size:30,anim:"bob",delay:.4},
+        {e:"🙏",left:84,bottom:4,size:28,anim:"bob",delay:.6},
+      ],
+    },
+    okphansa: {
+      label:"ออกพรรษา", emoji:"🛶", category:"วันสำคัญทางพุทธศาสนา", grad:"linear-gradient(135deg,#8A4A1E,#4A2A12)",
+      accent:"#D97A2A", glow:"#8A4A1E", phone:"#1F160F", card:"#2A1E14", particle:"none",
+      sky:"linear-gradient(180deg,#1A1D33,#4A3020)", ground:"#141E33",
+      mode:"night",
+      fact:"วันออกพรรษาคือวันสิ้นสุดการจำพรรษา 3 เดือนของพระสงฆ์ มีประเพณีตักบาตรเทโวและไหลเรือไฟที่สืบทอดมาในหลายจังหวัดริมแม่น้ำ",
+      scene:[
+        {e:"🛶",left:44,bottom:4,size:44,anim:"bob"},
+        {e:"🔥",left:50,bottom:10,size:26,anim:"bob",delay:.2},
+        {e:"🛕",left:78,bottom:0,size:44,anim:"still",delay:.3},
+        {e:"🌊",left:14,bottom:2,size:30,anim:"bob",delay:.5},
+      ],
+    },
+    sartthai: {
+      label:"วันสารทไทย", emoji:"🌾", category:"เทศกาลรื่นเริง", grad:"linear-gradient(135deg,#8A6A2E,#5C4A1E)",
+      accent:"#C9972F", glow:"#8A6A2E", phone:"#201C10", card:"#2B2516", particle:"petal",
+      sky:"linear-gradient(180deg,#F4D98A,#C9972F)", ground:"#5C4A1E",
+      mode:"day",
+      fact:"วันสารทไทยตรงกับวันแรม 15 ค่ำ เดือน 10 เป็นวันทำบุญอุทิศส่วนกุศลให้บรรพบุรุษ ขนมประจำเทศกาลคือกระยาสารทที่ทำจากข้าวตากคลุกน้ำตาลและถั่ว",
+      scene:[
+        {e:"🛕",left:66,bottom:0,size:50,anim:"still"},
+        {e:"🌾",left:14,bottom:2,size:34,anim:"sway"},
+        {e:"🌾",left:26,bottom:0,size:28,anim:"sway",delay:.4},
+        {e:"🍯",left:40,bottom:4,size:26,anim:"bob",delay:.3},
+        {e:"🙏",left:88,bottom:4,size:26,anim:"bob",delay:.6},
+      ],
+    },
+    childrenday: {
+      label:"วันเด็กแห่งชาติ", emoji:"🎈", category:"วันสำคัญของชาติ", grad:"linear-gradient(135deg,#1E8FA8,#D9A227)",
+      accent:"#1E8FA8", glow:"#1E8FA8", phone:"#0E2630", card:"#163440", particle:"confetti",
+      sky:"linear-gradient(180deg,#58C4EE,#FCE7A0)", ground:"#2E9E6B",
+      mode:"day",
+      fact:"วันเด็กแห่งชาติจัดขึ้นเสาร์ที่สองของเดือนมกราคมทุกปี เริ่มจัดครั้งแรกเมื่อปี พ.ศ. 2498 เพื่อให้ความสำคัญกับเด็กในฐานะกำลังสำคัญของชาติในอนาคต",
+      scene:[
+        {e:"🎈",left:16,bottom:30,size:34,anim:"bob"},
+        {e:"🎈",left:84,bottom:40,size:30,anim:"bob",delay:.5},
+        {e:"🧸",left:34,bottom:2,size:36,anim:"bob",delay:.3},
+        {e:"🪁",left:66,bottom:58,size:32,anim:"sway",delay:.4},
+      ],
+    },
+    teacherday: {
+      label:"วันครู", emoji:"📚", category:"วันสำคัญของชาติ", grad:"linear-gradient(135deg,#2E4E72,#16263B)",
+      accent:"#C9972F", glow:"#2E4E72", phone:"#101A28", card:"#172435", particle:"none",
+      sky:"linear-gradient(180deg,#A9C7DD,#E7EFF4)", ground:"#4A6B4A",
+      mode:"day",
+      fact:"วันครูแห่งชาติตรงกับวันที่ 16 มกราคมของทุกปี เริ่มจัดครั้งแรกเมื่อปี พ.ศ. 2500 เพื่อระลึกถึงพระคุณของครู ประเพณีสำคัญคือพิธีไหว้ครูด้วยดอกเข็มและหญ้าแพรก",
+      scene:[
+        {e:"🛕",left:68,bottom:0,size:46,anim:"still"},
+        {e:"📚",left:20,bottom:2,size:34,anim:"still",delay:.2},
+        {e:"✏️",left:34,bottom:4,size:24,anim:"bob",delay:.5},
+        {e:"🌾",left:48,bottom:0,size:26,anim:"sway",delay:.3},
+      ],
+    },
+    chakri: {
+      label:"วันจักรี", emoji:"🏛️", category:"วันสำคัญของชาติ", grad:"linear-gradient(135deg,#1F3A5C,#0E2036)",
+      accent:"#C9A227", glow:"#1F3A5C", phone:"#10192A", card:"#182538", particle:"none",
+      sky:"linear-gradient(180deg,#9FC3DE,#E7EFF4)", ground:"#1F3A5C",
+      mode:"day",
+      fact:"วันจักรีระลึกถึงวันที่พระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลกมหาราชทรงสถาปนาราชวงศ์จักรีและกรุงเทพมหานคร เมื่อปี พ.ศ. 2325",
+      scene:[
+        {e:"🏛️",left:50,bottom:0,size:60,anim:"still"},
+        {e:"🇹🇭",left:18,bottom:4,size:34,anim:"sway",delay:.2},
+        {e:"📜",left:80,bottom:4,size:28,anim:"still",delay:.4},
+      ],
+    },
+    chatramongkol: {
+      label:"วันฉัตรมงคล", emoji:"👑", category:"วันสำคัญของชาติ", grad:"linear-gradient(135deg,#7A1F2B,#4A1018)",
+      accent:"#C9A227", glow:"#7A1F2B", phone:"#1F1013", card:"#2A1519", particle:"none",
+      sky:"linear-gradient(180deg,#F4D98A,#E7B65A)", ground:"#7A1F2B",
+      mode:"day",
+      fact:"วันฉัตรมงคลระลึกถึงพระราชพิธีบรมราชาภิเษก ซึ่งเป็นพระราชพิธีโบราณที่สถาปนาพระมหากษัตริย์ให้สมบูรณ์ตามราชประเพณี",
+      scene:[
+        {e:"👑",left:50,bottom:36,size:44,anim:"still"},
+        {e:"🏛️",left:50,bottom:0,size:56,anim:"still",delay:.2},
+        {e:"🇹🇭",left:16,bottom:4,size:30,anim:"sway",delay:.4},
+      ],
+    },
+  };
+
+  const CATEGORY_ORDER = ["เริ่มต้น","เทศกาลรื่นเริง","วันสำคัญทางพุทธศาสนา","วันสำคัญของชาติ"];
+
+  const screen   = document.getElementById("screen");
+  const appHeader= document.getElementById("appHeader");
+  const brandEmoji=document.getElementById("brandEmoji");
+  const brandText =document.getElementById("brandText");
+  const ambient  = document.getElementById("ambient");
+  const switcher = document.getElementById("switcher");
+  const particlesEl = document.getElementById("particles");
+  const tabbar = document.getElementById("tabbar");
+  const ctaCard = document.getElementById("ctaCard");
+  const factCard = document.getElementById("factCard");
+  const factText = document.getElementById("factText");
+  const stage = document.getElementById("stage");
+  const ground = document.getElementById("ground");
+  const moon = document.getElementById("moon");
+  const sun = document.getElementById("sun");
+  const stars = document.getElementById("stars");
+  const sceneItems = document.getElementById("sceneItems");
+
+  for (let i=0;i<40;i++){
+    const s = document.createElement("span");
+    s.style.left = Math.random()*100+"%";
+    s.style.top = Math.random()*70+"%";
+    s.style.animationDelay = (Math.random()*2.6).toFixed(2)+"s";
+    stars.appendChild(s);
+  }
+
+  let particleTimer = null;
+
+  function clearParticles(){
+    if (particleTimer) { clearInterval(particleTimer); particleTimer = null; }
+    particlesEl.innerHTML = "";
+  }
+
+  function spawnParticle(kind){
+    const el = document.createElement("div");
+    el.className = "particle";
+    const left = Math.random()*100;
+    const dx = (Math.random()*80-40) + "px";
+    const dur = (6 + Math.random()*6).toFixed(1) + "s";
+    const delay = (Math.random()*0.6).toFixed(2) + "s";
+    el.style.left = left + "vw";
+    el.style.setProperty("--dx", dx);
+
+    if (kind === "droplet"){
+      el.textContent = "💧";
+      el.style.fontSize = (12+Math.random()*10)+"px";
+      el.style.top = "-5vh";
+      el.style.animation = `drift ${dur} linear ${delay} 1 forwards`;
+    } else if (kind === "snow"){
+      el.textContent = "❄";
+      el.style.color = "#fff";
+      el.style.fontSize = (10+Math.random()*10)+"px";
+      el.style.top = "-5vh";
+      el.style.setProperty("--rot", (Math.random()*180-90)+"deg");
+      el.style.animation = `drift ${dur} linear ${delay} 1 forwards`;
+    } else if (kind === "confetti"){
+      const colors = ["#C9A227","#E2574C","#F4D35E","#8CC084","#5CA0D3"];
+      el.style.width = "7px"; el.style.height="12px";
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      el.style.borderRadius = "2px";
+      el.style.top = "-5vh";
+      el.style.setProperty("--rot", (Math.random()*360)+"deg");
+      el.style.animation = `drift ${dur} linear ${delay} 1 forwards`;
+    } else if (kind === "lantern"){
+      el.textContent = "🏮";
+      el.style.fontSize = (14+Math.random()*12)+"px";
+      el.style.top = "100vh";
+      el.style.animation = `rise ${(9+Math.random()*5).toFixed(1)}s linear ${delay} 1 forwards`;
+    } else if (kind === "bat"){
+      el.textContent = "🦇";
+      el.style.fontSize = (12+Math.random()*10)+"px";
+      el.style.top = (10+Math.random()*50)+"vh";
+      el.style.left = "-5vw";
+      el.style.animation = `drift ${(5+Math.random()*4).toFixed(1)}s linear ${delay} 1 forwards`;
+      el.style.setProperty("--dx", (window.innerWidth*1.2)+"px");
+    } else if (kind === "petal"){
+      el.textContent = "🌸";
+      el.style.fontSize = (10+Math.random()*8)+"px";
+      el.style.top = "-5vh";
+      el.style.opacity = ".85";
+      el.style.animation = `drift ${(10+Math.random()*6).toFixed(1)}s linear ${delay} 1 forwards`;
+    } else if (kind === "redgold"){
+      const colors = ["#C9A227","#E2574C"];
+      el.style.width = "9px"; el.style.height="9px";
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      el.style.transform = "rotate(45deg)";
+      el.style.top = "-5vh";
+      el.style.setProperty("--rot", "45deg");
+      el.style.animation = `drift ${dur} linear ${delay} 1 forwards`;
+    } else {
+      el.remove(); return;
+    }
+    particlesEl.appendChild(el);
+    setTimeout(()=>el.remove(), 16000);
+  }
+
+  function startParticles(kind){
+    clearParticles();
+    if (!kind || kind === "none") return;
+    for (let i=0;i<7;i++) setTimeout(()=>spawnParticle(kind), i*260);
+    particleTimer = setInterval(()=>spawnParticle(kind), 600);
+  }
+
+  function applyTheme(key){
+    const t = THEMES[key];
+    document.querySelectorAll(".switcher button").forEach(b=>b.classList.toggle("active", b.dataset.key===key));
+
+    appHeader.style.background = t.grad;
+    ambient.style.background = `radial-gradient(60% 50% at 50% 18%, ${t.glow} 0%, transparent 70%)`;
+    document.documentElement.style.setProperty("--accent", t.accent);
+    screen.style.setProperty("--phone-bg", t.phone);
+    screen.style.background = t.phone;
+    document.querySelectorAll(".card").forEach(c=>{
+      if (!c.classList.contains("cta")) { c.style.background = t.card; }
+    });
+    ctaCard.style.background = t.accent;
+    tabbar.style.background = t.phone;
+    tabbar.querySelectorAll(".tab").forEach((el,i)=>{
+      el.style.background = i===0 ? t.accent : "transparent";
+      el.style.color = i===0 ? "#fff" : "";
+    });
+    brandEmoji.textContent = t.emoji;
+    brandEmoji.style.display = t.emoji ? "inline" : "none";
+    brandText.textContent = (t.emoji ? t.emoji + " " : "") + "บ้านเช่า";
+
+    factText.textContent = t.fact || "";
+    factCard.style.background = `color-mix(in srgb, ${t.accent} 16%, var(--card))`;
+    factCard.style.borderColor = `color-mix(in srgb, ${t.accent} 38%, var(--card-line))`;
+
+    stage.style.background = t.sky;
+    ground.style.background = t.ground;
+    moon.style.opacity = t.mode === "night" ? 1 : 0;
+    sun.style.opacity = t.mode === "day" ? 1 : 0;
+    stars.style.opacity = t.mode === "night" ? 1 : 0;
+
+    sceneItems.innerHTML = "";
+    (t.scene || []).forEach(item=>{
+      const el = document.createElement("div");
+      el.className = "scene-item" + (item.anim==="sway" ? " sway" : item.anim==="still" ? " still" : "");
+      el.textContent = item.e;
+      el.style.left = item.left + "%";
+      el.style.bottom = item.bottom + "%";
+      el.style.fontSize = item.size + "px";
+      if (item.delay) el.style.animationDelay = item.delay + "s";
+      sceneItems.appendChild(el);
+    });
+
+    startParticles(t.particle);
+  }
+
+  CATEGORY_ORDER.forEach(cat=>{
+    const entries = Object.entries(THEMES).filter(([,t])=>t.category===cat);
+    if (!entries.length) return;
+
+    const label = document.createElement("div");
+    label.className = "group-label";
+    label.textContent = cat;
+    switcher.appendChild(label);
+
+    const row = document.createElement("div");
+    row.className = "group-row";
+    entries.forEach(([key,t])=>{
+      const b = document.createElement("button");
+      b.dataset.key = key;
+      b.innerHTML = `<span class="sw-emoji">${t.emoji || "🏠"}</span><span>${t.label}</span>`;
+      b.addEventListener("click", ()=>applyTheme(key));
+      row.appendChild(b);
+    });
+    switcher.appendChild(row);
+  });
+
+  function tickClock(){
+    const el = document.getElementById("clock");
+    const now = new Date();
+    el.textContent = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  }
+  tickClock();
+  setInterval(tickClock, 15000);
+
+  applyTheme("christmas");
+</script>

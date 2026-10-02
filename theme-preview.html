@@ -1,0 +1,184 @@
+<title>ตัวอย่างธีม บ้านเช่า</title>
+<style>
+  /* layout: grid of mock-phone cards, one per festival theme, each showing header + tab bar */
+  :root{
+    --bg:#F3F1EC;
+    --fg:#2A2621;
+    --muted:#786F62;
+    --card:#FFFFFF;
+    --line:#E3DFD5;
+    --accent:#2A3C52;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#17150F;
+      --fg:#EFEAE0;
+      --muted:#A89E8D;
+      --card:#221F18;
+      --line:#38332A;
+      --accent:#6E8CB0;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#17150F;
+    --fg:#EFEAE0;
+    --muted:#A89E8D;
+    --card:#221F18;
+    --line:#38332A;
+    --accent:#6E8CB0;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'IBM Plex Sans Thai', 'Noto Sans Thai', system-ui, sans-serif;
+    padding:28px 16px 48px;
+    margin:0;
+  }
+  .wrap{max-width:980px;margin:0 auto}
+  h1{
+    font-size:clamp(20px,3vw,26px);
+    font-weight:700;
+    margin:0 0 4px;
+    text-wrap:balance;
+  }
+  p.lead{
+    color:var(--muted);
+    margin:0 0 28px;
+    font-size:14px;
+    line-height:1.6;
+    max-width:60ch;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+  }
+  figure{
+    margin:0;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .phone-header{
+    padding:14px 14px 12px;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .phone-header .emoji{font-size:17px;line-height:1}
+  .phone-header .title{font-weight:700;font-size:14px}
+  .phone-body{
+    padding:12px 14px 10px;
+    font-size:12px;
+    color:var(--muted);
+    border-bottom:1px solid var(--line);
+  }
+  .phone-body .room{
+    font-weight:700;
+    color:var(--fg);
+    font-size:13px;
+    margin-bottom:2px;
+  }
+  .tabbar{
+    display:flex;
+    gap:6px;
+    padding:10px 10px;
+  }
+  .tabbar span{
+    flex:1;
+    text-align:center;
+    font-size:11px;
+    padding:6px 4px;
+    border-radius:8px;
+    color:var(--muted);
+    background:transparent;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .tabbar span.active{
+    color:#fff;
+    font-weight:700;
+  }
+  figcaption{
+    padding:10px 14px 14px;
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:.02em;
+  }
+  figcaption b{color:var(--fg);font-size:13px;display:block;margin-bottom:2px;font-weight:700}
+
+  .note{
+    margin-top:28px;
+    font-size:13px;
+    color:var(--muted);
+    border-top:1px solid var(--line);
+    padding-top:16px;
+    line-height:1.7;
+  }
+  .note code{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:1px 5px;
+    font-size:12px;
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+
+<div class="wrap">
+  <h1>ตัวอย่างสีธีมในแอป บ้านเช่า</h1>
+  <p class="lead">หน้าจอจริงจะมีหัวแอปสีตามธีม แท็บที่เลือกอยู่จะติดสีเดียวกัน ส่วนที่เหลือของแอปยังเหมือนเดิมทุกอย่าง เปลี่ยนได้จากหน้าตั้งค่าโดยไม่ต้องอัปโหลดโค้ดใหม่</p>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="note">
+    ชื่อธีมที่เลือกได้ในช่องตั้งค่า: <code>default</code> · <code>songkran</code> · <code>loykrathong</code> · <code>newyear</code> · <code>christmas</code> · <code>halloween</code>
+  </div>
+</div>
+
+<script>
+  const THEMES = [
+    { key:"default",     label:"ปกติ",       emoji:"",   headerBg:"#1F3A5C" },
+    { key:"songkran",    label:"สงกรานต์",   emoji:"💦", headerBg:"#1E6FA8" },
+    { key:"loykrathong",label:"ลอยกระทง",   emoji:"🏮", headerBg:"#3A2E5C", accent:"#C9972F" },
+    { key:"newyear",     label:"ปีใหม่",     emoji:"🎉", headerBg:"#7A1F2B", accent:"#B5892B" },
+    { key:"christmas",   label:"คริสต์มาส",  emoji:"🎄", headerBg:"#1E5C3A", accent:"#B5292F" },
+    { key:"halloween",   label:"ฮาโลวีน",    emoji:"🎃", headerBg:"#2B2130", accent:"#D97A2A" },
+  ];
+
+  const tabs = ["บิล","ร้านค้า","โปรไฟล์","กฎการเช่า"];
+
+  const grid = document.getElementById("grid");
+
+  THEMES.forEach(t => {
+    const accent = t.accent || t.headerBg;
+    const fig = document.createElement("figure");
+    fig.innerHTML = `
+      <div class="phone-header" style="background:${t.headerBg}">
+        <span class="emoji">${t.emoji}</span>
+        <span class="title">${t.emoji ? t.emoji + " " : ""}บ้านเช่า</span>
+      </div>
+      <div class="phone-body">
+        <div class="room">ห้อง มีสุข3 · 3,500 บาท</div>
+        ครบกำหนดชำระ 5 พ.ย. 2569
+      </div>
+      <div class="tabbar">
+        ${tabs.map((label,i)=>`<span${i===0?` class="active" style="background:${accent}"`:""}>${label}</span>`).join("")}
+      </div>
+      <figcaption><b>${t.label}</b>ธีม: ${t.key}</figcaption>
+    `;
+    grid.appendChild(fig);
+  });
+</script>
