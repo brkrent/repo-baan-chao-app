@@ -20,64 +20,101 @@ const baht = (n) => Math.round(n || 0).toLocaleString("th-TH", { maximumFraction
 // เลือก "อัตโนมัติ" ได้ด้วย — ระบบจะขึ้นธีมให้เอง 7 วันก่อนถึงวันงานจนถึง 7 วันหลังวันงาน
 // ถ้ามีวันสำคัญอื่นเหลื่อมกัน จะเลือกวันที่ใกล้ "วันจริง" ที่สุดให้ขึ้นก่อน
 const THEMES = {
-  default: { label: "ปกติ", category: "เริ่มต้น", headerBg: C.navy, accent: C.navy, emoji: "" },
+  default: { label: "ปกติ", category: "เริ่มต้น", headerBg: C.navy, accent: C.navy, emoji: "",
+    sky: "linear-gradient(180deg,#8FB9D8,#DDE9EC)", ground: "#6FA06B", mode: "day" },
 
   songkran: { label: "สงกรานต์", category: "เทศกาลรื่นเริง", headerBg: "#1E6FA8", accent: "#1E6FA8", emoji: "💦",
     fact: "สงกรานต์คือวันขึ้นปีใหม่ไทยแบบดั้งเดิม เดิมเน้นการสรงน้ำพระและรดน้ำขอพรผู้ใหญ่ ก่อนจะกลายเป็นเทศกาลสาดน้ำที่รู้จักกันทั่วโลก",
-    particle: ["droplet", "splash"], scene: [{ e: "🐘", left: 0, top: 30, size: 56, anim: "patrol" }, { e: "🌺", left: 86, top: 62, size: 26, anim: "sway", delay: .3 }] },
+    particle: ["droplet", "splash"], scene: [{ e: "🐘", left: 0, top: 30, size: 56, anim: "patrol" }, { e: "🌺", left: 86, top: 62, size: 26, anim: "sway", delay: .3 }],
+    sky: "linear-gradient(180deg,#58C4EE,#C9EEFB)", ground: "#3FA6C2", mode: "day",
+    bgScene: [{ e: "🐘", left: 10, bottom: 2, size: 62, anim: "bob" }, { e: "🚚", left: 68, bottom: 0, size: 52, anim: "still" }, { e: "🌺", left: 30, bottom: 4, size: 28, anim: "sway", delay: .3 }, { e: "🌺", left: 88, bottom: 8, size: 24, anim: "sway", delay: .9 }] },
   loykrathong: { label: "ลอยกระทง", category: "เทศกาลรื่นเริง", headerBg: "#3A2E5C", accent: "#C9972F", emoji: "🏮",
     fact: "ลอยกระทงจัดขึ้นคืนวันเพ็ญเดือน 12 เพื่อขอขมาและแสดงความกตัญญูต่อพระแม่คงคา เชื่อกันว่าเป็นการลอยทิ้งสิ่งไม่ดีไปกับสายน้ำ",
-    particle: ["lantern", "glow"], scene: [{ e: "🛶", left: 0, top: 45, size: 46, anim: "patrolsmall" }, { e: "🏮", left: 88, top: 15, size: 28, anim: "sway", delay: .4 }] },
+    particle: ["lantern", "glow"], scene: [{ e: "🛶", left: 0, top: 45, size: 46, anim: "patrolsmall" }, { e: "🏮", left: 88, top: 15, size: 28, anim: "sway", delay: .4 }],
+    sky: "linear-gradient(180deg,#241A3D,#4B3A6B)", ground: "#1B2B44", mode: "night",
+    bgScene: [{ e: "🏮", left: 12, bottom: 58, size: 34, anim: "sway" }, { e: "🏮", left: 85, bottom: 62, size: 30, anim: "sway", delay: .9 }, { e: "🪷", left: 36, bottom: 4, size: 30, anim: "bob", delay: .2 }, { e: "🛶", left: 68, bottom: 3, size: 40, anim: "bob", delay: .3 }] },
   newyear: { label: "ปีใหม่", category: "เทศกาลรื่นเริง", headerBg: "#7A1F2B", accent: "#B5892B", emoji: "🎉",
     fact: "ไทยเริ่มใช้วันที่ 1 มกราคม เป็นวันขึ้นปีใหม่สากลอย่างเป็นทางการตั้งแต่ปี พ.ศ. 2484 แทนวันขึ้นปีใหม่เดิมคือ 1 เมษายน",
-    particle: ["confetti", "spark"], scene: [{ e: "🎆", left: 6, top: 15, size: 34, anim: "still" }, { e: "🎇", left: 88, top: 20, size: 30, anim: "still", delay: .4 }] },
+    particle: ["confetti", "spark"], scene: [{ e: "🎆", left: 6, top: 15, size: 34, anim: "still" }, { e: "🎇", left: 88, top: 20, size: 30, anim: "still", delay: .4 }],
+    sky: "linear-gradient(180deg,#1C1030,#3C1B33)", ground: "#241225", mode: "night",
+    bgScene: [{ e: "🎆", left: 14, bottom: 50, size: 46, anim: "still" }, { e: "🎇", left: 78, bottom: 60, size: 38, anim: "still", delay: .4 }, { e: "🥂", left: 34, bottom: 2, size: 34, anim: "bob", delay: .2 }, { e: "🎊", left: 58, bottom: 4, size: 30, anim: "sway", delay: .6 }] },
   christmas: { label: "คริสต์มาส", category: "เทศกาลรื่นเริง", headerBg: "#1E5C3A", accent: "#B5292F", emoji: "🎄",
     fact: "วันคริสต์มาสระลึกถึงการประสูติของพระเยซู เป็นเทศกาลสำคัญของชาวคริสต์ทั่วโลก ส่วนในไทยนิยมฉลองกันทั่วไปแบบไม่เน้นศาสนา",
-    particle: ["snow", "glow"], scene: [{ e: "🛷", left: 0, top: 12, size: 48, anim: "patrol" }, { e: "🎄", left: 88, top: 50, size: 40, anim: "sway", delay: .2 }] },
+    particle: ["snow", "glow"], scene: [{ e: "🛷", left: 0, top: 12, size: 48, anim: "patrol" }, { e: "🎄", left: 88, top: 50, size: 40, anim: "sway", delay: .2 }],
+    sky: "linear-gradient(180deg,#152A3A,#2E4C5C)", ground: "#EAF3F7", mode: "night",
+    bgScene: [{ e: "🎄", left: 12, bottom: 2, size: 64, anim: "sway" }, { e: "🏠", left: 76, bottom: 0, size: 48, anim: "still", delay: .2 }, { e: "🎅", left: 36, bottom: 2, size: 40, anim: "bob", delay: .3 }, { e: "🦌", left: 52, bottom: 0, size: 34, anim: "bob", delay: .5 }, { e: "⛄", left: 88, bottom: 2, size: 32, anim: "still", delay: .1 }] },
   halloween: { label: "ฮาโลวีน", category: "เทศกาลรื่นเริง", headerBg: "#2B2130", accent: "#D97A2A", emoji: "🎃",
     fact: "ฮาโลวีนมีต้นกำเนิดจากเทศกาลเคลติกโบราณ เชื่อว่าเป็นคืนที่เส้นแบ่งระหว่างโลกมนุษย์กับโลกวิญญาณบางที่สุดในรอบปี",
-    particle: ["bat", "glow"], scene: [{ e: "🧙", left: 0, top: 25, size: 50, anim: "patrol" }, { e: "🎃", left: 88, top: 58, size: 30, anim: "still", delay: .3 }] },
+    particle: ["bat", "glow"], scene: [{ e: "🧙", left: 0, top: 25, size: 50, anim: "patrol" }, { e: "🎃", left: 88, top: 58, size: 30, anim: "still", delay: .3 }],
+    sky: "linear-gradient(180deg,#2B1E42,#5A3A66)", ground: "#241A2E", mode: "night",
+    bgScene: [{ e: "🎃", left: 14, bottom: 2, size: 40, anim: "still" }, { e: "👻", left: 62, bottom: 30, size: 38, anim: "bob", delay: .4 }, { e: "🕸️", left: 4, bottom: 68, size: 40, anim: "still" }, { e: "🧙", left: 80, bottom: 2, size: 44, anim: "bob", delay: .6 }] },
   chinesenewyear: { label: "ตรุษจีน", category: "เทศกาลรื่นเริง", headerBg: "#7A1620", accent: "#C9972F", emoji: "🧧",
     fact: "ตรุษจีนคือวันขึ้นปีใหม่ตามปฏิทินจันทรคติจีน ครอบครัวจะไหว้บรรพบุรุษและแจกอั่งเปาสีแดง-ทอง เพื่อความเป็นสิริมงคล",
-    particle: ["redgold", "glow"], scene: [{ e: "🐉", left: 0, top: 25, size: 64, anim: "patrol" }, { e: "🏮", left: 86, top: 14, size: 28, anim: "sway", delay: .3 }] },
+    particle: ["redgold", "glow"], scene: [{ e: "🐉", left: 0, top: 25, size: 64, anim: "patrol" }, { e: "🏮", left: 86, top: 14, size: 28, anim: "sway", delay: .3 }],
+    sky: "linear-gradient(180deg,#7A1620,#B5272D)", ground: "#241315", mode: "night",
+    bgScene: [{ e: "🏮", left: 10, bottom: 58, size: 32, anim: "sway" }, { e: "🏮", left: 86, bottom: 60, size: 30, anim: "sway", delay: .5 }, { e: "🐉", left: 40, bottom: 2, size: 58, anim: "bob", delay: .2 }, { e: "🧧", left: 70, bottom: 4, size: 30, anim: "sway", delay: .4 }] },
   midautumn: { label: "ไหว้พระจันทร์", category: "เทศกาลรื่นเริง", headerBg: "#14204A", accent: "#C9A227", emoji: "🎑",
     fact: "เทศกาลไหว้พระจันทร์จัดคืนวันเพ็ญเดือน 8 ตามจันทรคติจีน เพื่อขอบคุณพระจันทร์และความอุดมสมบูรณ์ สัญลักษณ์คือขนมไหว้พระจันทร์และกระต่าย",
-    particle: ["lantern", "glow"], scene: [{ e: "🐇", left: 0, top: 50, size: 40, anim: "patrolsmall" }, { e: "🎑", left: 88, top: 16, size: 36, anim: "still", delay: .2 }] },
+    particle: ["lantern", "glow"], scene: [{ e: "🐇", left: 0, top: 50, size: 40, anim: "patrolsmall" }, { e: "🎑", left: 88, top: 16, size: 36, anim: "still", delay: .2 }],
+    sky: "linear-gradient(180deg,#0E1733,#243764)", ground: "#141F3F", mode: "night",
+    bgScene: [{ e: "🎑", left: 60, bottom: 55, size: 50, anim: "still" }, { e: "🐇", left: 30, bottom: 2, size: 34, anim: "bob", delay: .3 }, { e: "🥮", left: 14, bottom: 4, size: 30, anim: "bob", delay: .6 }, { e: "🏮", left: 84, bottom: 10, size: 28, anim: "sway", delay: .4 }] },
   vegetarian: { label: "กินเจ", category: "เทศกาลรื่นเริง", headerBg: "#8A6A1E", accent: "#C9A227", emoji: "🟡",
     fact: "เทศกาลกินเจกินเวลา 9 วัน ผู้ร่วมงานละเว้นเนื้อสัตว์เพื่อชำระกายใจให้บริสุทธิ์ นิยมมากในภาคใต้ โดยเฉพาะที่จังหวัดภูเก็ต",
-    particle: ["petal", "glow"], scene: [{ e: "🚩", left: 6, top: 16, size: 28, anim: "sway" }, { e: "🥬", left: 88, top: 55, size: 26, anim: "bob", delay: .3 }] },
+    particle: ["petal", "glow"], scene: [{ e: "🚩", left: 6, top: 16, size: 28, anim: "sway" }, { e: "🥬", left: 88, top: 55, size: 26, anim: "bob", delay: .3 }],
+    sky: "linear-gradient(180deg,#F4E6B8,#C9A227)", ground: "#8A6A1E", mode: "day",
+    bgScene: [{ e: "🚩", left: 14, bottom: 10, size: 36, anim: "sway" }, { e: "🚩", left: 82, bottom: 12, size: 32, anim: "sway", delay: .4 }, { e: "🥬", left: 32, bottom: 2, size: 30, anim: "bob", delay: .2 }] },
   sartthai: { label: "วันสารทไทย", category: "เทศกาลรื่นเริง", headerBg: "#5C4A1E", accent: "#C9972F", emoji: "🌾",
     fact: "วันสารทไทยตรงกับวันแรม 15 ค่ำ เดือน 10 เป็นวันทำบุญอุทิศส่วนกุศลให้บรรพบุรุษ ขนมประจำเทศกาลคือกระยาสารทที่ทำจากข้าวตากคลุกน้ำตาลและถั่ว",
-    particle: ["petal", "glow"], scene: [{ e: "🌾", left: 6, top: 60, size: 30, anim: "sway" }, { e: "🍯", left: 88, top: 20, size: 26, anim: "bob", delay: .3 }] },
+    particle: ["petal", "glow"], scene: [{ e: "🌾", left: 6, top: 60, size: 30, anim: "sway" }, { e: "🍯", left: 88, top: 20, size: 26, anim: "bob", delay: .3 }],
+    sky: "linear-gradient(180deg,#F4D98A,#C9972F)", ground: "#5C4A1E", mode: "day",
+    bgScene: [{ e: "🛕", left: 66, bottom: 0, size: 50, anim: "still" }, { e: "🌾", left: 14, bottom: 2, size: 34, anim: "sway" }, { e: "🍯", left: 40, bottom: 4, size: 26, anim: "bob", delay: .3 }] },
 
   makhabucha: { label: "มาฆบูชา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A3B2A", accent: "#C9972F", emoji: "🪷",
     fact: "วันมาฆบูชาระลึกถึงวันที่พระพุทธเจ้าทรงแสดง “โอวาทปาฏิโมกข์” แก่พระอรหันต์ 1,250 องค์ ที่มาประชุมพร้อมกันโดยมิได้นัดหมาย",
-    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }] },
+    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }],
+    sky: "linear-gradient(180deg,#1A1D33,#3A3250)", ground: "#241F15", mode: "night",
+    bgScene: [{ e: "🛕", left: 50, bottom: 0, size: 58, anim: "still" }, { e: "🪷", left: 20, bottom: 2, size: 30, anim: "bob", delay: .3 }, { e: "🕯️", left: 34, bottom: 4, size: 24, anim: "still", delay: .1 }] },
   visakhabucha: { label: "วิสาขบูชา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A3B2A", accent: "#C9972F", emoji: "🪷",
     fact: "วันวิสาขบูชาเป็นวันประสูติ ตรัสรู้ และปรินิพพานของพระพุทธเจ้า ตรงกันทั้งสามเหตุการณ์ในวันเดียว องค์การสหประชาชาติยกให้เป็นวันสำคัญของโลก",
-    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }] },
+    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }],
+    sky: "linear-gradient(180deg,#1A1D33,#3A3250)", ground: "#241F15", mode: "night",
+    bgScene: [{ e: "🌳", left: 18, bottom: 0, size: 60, anim: "sway" }, { e: "🛕", left: 58, bottom: 0, size: 50, anim: "still", delay: .2 }, { e: "🪷", left: 38, bottom: 2, size: 26, anim: "bob", delay: .4 }] },
   asalhabucha: { label: "อาสาฬหบูชา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A3B2A", accent: "#C9972F", emoji: "🪷",
     fact: "วันอาสาฬหบูชาระลึกถึงการแสดงปฐมเทศนาครั้งแรกของพระพุทธเจ้า คือ “ธัมมจักกัปปวัตนสูตร” นับเป็นวันที่เกิดพระสงฆ์องค์แรกในพระพุทธศาสนา",
-    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }] },
+    particle: ["petal", "glow"], scene: [{ e: "🪷", left: 6, top: 60, size: 28, anim: "bob" }, { e: "🕯️", left: 88, top: 20, size: 26, anim: "still", delay: .3 }],
+    sky: "linear-gradient(180deg,#1A1D33,#3A3250)", ground: "#241F15", mode: "night",
+    bgScene: [{ e: "🛕", left: 50, bottom: 0, size: 58, anim: "still" }, { e: "🪷", left: 22, bottom: 2, size: 28, anim: "bob", delay: .3 }, { e: "🕯️", left: 76, bottom: 4, size: 26, anim: "still", delay: .5 }] },
   khaophansa: { label: "เข้าพรรษา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#1E2E1E", accent: "#8A6A2E", emoji: "🕯️",
     fact: "วันเข้าพรรษาคือวันที่พระสงฆ์เริ่มจำพรรษาอยู่ ณ วัดใดวัดหนึ่งตลอด 3 เดือนในฤดูฝน เป็นที่มาของประเพณีถวายเทียนพรรษาที่สืบทอดมานาน",
-    particle: ["petal", "glow"], scene: [{ e: "🕯️", left: 6, top: 55, size: 34, anim: "still" }, { e: "🌧️", left: 88, top: 16, size: 26, anim: "bob", delay: .3 }] },
+    particle: ["petal", "glow"], scene: [{ e: "🕯️", left: 6, top: 55, size: 34, anim: "still" }, { e: "🌧️", left: 88, top: 16, size: 26, anim: "bob", delay: .3 }],
+    sky: "linear-gradient(180deg,#5C6B66,#8B9B92)", ground: "#3A4A3A", mode: "day",
+    bgScene: [{ e: "🛕", left: 58, bottom: 0, size: 54, anim: "still" }, { e: "🕯️", left: 30, bottom: 2, size: 46, anim: "still", delay: .2 }, { e: "🙏", left: 84, bottom: 4, size: 28, anim: "bob", delay: .6 }] },
   okphansa: { label: "ออกพรรษา", category: "วันสำคัญทางพุทธศาสนา", headerBg: "#4A2A12", accent: "#D97A2A", emoji: "🛶",
     fact: "วันออกพรรษาคือวันสิ้นสุดการจำพรรษา 3 เดือนของพระสงฆ์ มีประเพณีตักบาตรเทโวและไหลเรือไฟที่สืบทอดมาในหลายจังหวัดริมแม่น้ำ",
-    particle: ["glow"], scene: [{ e: "🛶", left: 0, top: 50, size: 42, anim: "patrolsmall" }, { e: "🔥", left: 88, top: 20, size: 24, anim: "bob", delay: .3 }] },
+    particle: ["glow"], scene: [{ e: "🛶", left: 0, top: 50, size: 42, anim: "patrolsmall" }, { e: "🔥", left: 88, top: 20, size: 24, anim: "bob", delay: .3 }],
+    sky: "linear-gradient(180deg,#1A1D33,#4A3020)", ground: "#141E33", mode: "night",
+    bgScene: [{ e: "🛶", left: 44, bottom: 4, size: 44, anim: "bob" }, { e: "🛕", left: 78, bottom: 0, size: 44, anim: "still", delay: .3 }, { e: "🌊", left: 14, bottom: 2, size: 30, anim: "bob", delay: .5 }] },
 
   chakri: { label: "วันจักรี", category: "วันสำคัญของชาติ", headerBg: "#0E2036", accent: "#C9A227", emoji: "🏛️",
     fact: "วันจักรีระลึกถึงวันที่พระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลกมหาราชทรงสถาปนาราชวงศ์จักรีและกรุงเทพมหานคร เมื่อปี พ.ศ. 2325",
-    particle: ["glow"], scene: [{ e: "🏛️", left: 88, top: 45, size: 34, anim: "still" }] },
+    particle: ["glow"], scene: [{ e: "🏛️", left: 88, top: 45, size: 34, anim: "still" }],
+    sky: "linear-gradient(180deg,#9FC3DE,#E7EFF4)", ground: "#1F3A5C", mode: "day",
+    bgScene: [{ e: "🏛️", left: 50, bottom: 0, size: 60, anim: "still" }, { e: "🇹🇭", left: 18, bottom: 4, size: 34, anim: "sway", delay: .2 }, { e: "📜", left: 80, bottom: 4, size: 28, anim: "still", delay: .4 }] },
   chatramongkol: { label: "วันฉัตรมงคล", category: "วันสำคัญของชาติ", headerBg: "#4A1018", accent: "#C9A227", emoji: "👑",
     fact: "วันฉัตรมงคลระลึกถึงพระราชพิธีบรมราชาภิเษก ซึ่งเป็นพระราชพิธีโบราณที่สถาปนาพระมหากษัตริย์ให้สมบูรณ์ตามราชประเพณี",
-    particle: ["glow"], scene: [{ e: "👑", left: 88, top: 20, size: 30, anim: "still" }] },
+    particle: ["glow"], scene: [{ e: "👑", left: 88, top: 20, size: 30, anim: "still" }],
+    sky: "linear-gradient(180deg,#F4D98A,#E7B65A)", ground: "#7A1F2B", mode: "day",
+    bgScene: [{ e: "👑", left: 50, bottom: 36, size: 44, anim: "still" }, { e: "🏛️", left: 50, bottom: 0, size: 56, anim: "still", delay: .2 }, { e: "🇹🇭", left: 16, bottom: 4, size: 30, anim: "sway", delay: .4 }] },
   childrenday: { label: "วันเด็กแห่งชาติ", category: "วันสำคัญของชาติ", headerBg: "#1E8FA8", accent: "#D9A227", emoji: "🎈",
     fact: "วันเด็กแห่งชาติจัดขึ้นเสาร์ที่สองของเดือนมกราคมทุกปี เริ่มจัดครั้งแรกเมื่อปี พ.ศ. 2498 เพื่อให้ความสำคัญกับเด็กในฐานะกำลังสำคัญของชาติในอนาคต",
-    particle: ["confetti", "balloon"], scene: [{ e: "🪁", left: 0, top: 18, size: 36, anim: "patrolsmall" }, { e: "🎈", left: 88, top: 55, size: 28, anim: "bob", delay: .3 }] },
+    particle: ["confetti", "balloon"], scene: [{ e: "🪁", left: 0, top: 18, size: 36, anim: "patrolsmall" }, { e: "🎈", left: 88, top: 55, size: 28, anim: "bob", delay: .3 }],
+    sky: "linear-gradient(180deg,#58C4EE,#FCE7A0)", ground: "#2E9E6B", mode: "day",
+    bgScene: [{ e: "🪁", left: 16, bottom: 30, size: 34, anim: "bob" }, { e: "🎈", left: 84, bottom: 40, size: 30, anim: "bob", delay: .5 }, { e: "🧸", left: 34, bottom: 2, size: 36, anim: "bob", delay: .3 }] },
   teacherday: { label: "วันครู", category: "วันสำคัญของชาติ", headerBg: "#16263B", accent: "#C9972F", emoji: "📚",
     fact: "วันครูแห่งชาติตรงกับวันที่ 16 มกราคมของทุกปี เริ่มจัดครั้งแรกเมื่อปี พ.ศ. 2500 เพื่อระลึกถึงพระคุณของครู ประเพณีสำคัญคือพิธีไหว้ครูด้วยดอกเข็มและหญ้าแพรก",
-    particle: ["petal", "glow"], scene: [{ e: "📚", left: 88, top: 50, size: 28, anim: "still" }] },
+    particle: ["petal", "glow"], scene: [{ e: "📚", left: 88, top: 50, size: 28, anim: "still" }],
+    sky: "linear-gradient(180deg,#A9C7DD,#E7EFF4)", ground: "#4A6B4A", mode: "day",
+    bgScene: [{ e: "🛕", left: 68, bottom: 0, size: 46, anim: "still" }, { e: "📚", left: 20, bottom: 2, size: 34, anim: "still", delay: .2 }, { e: "🌾", left: 48, bottom: 0, size: 26, anim: "sway", delay: .3 }] },
 };
 
 // รายการวันที่ของแต่ละธีม ใช้คำนวณ "ธีมอัตโนมัติ" — ขึ้นก่อนวันจริง 7 วัน ถึงหลังวันจริง 7 วัน
@@ -175,6 +212,14 @@ const THEME_FX_CSS = `
 .tfx-mascot.still{animation:none}
 .tfx-mascot.patrol{animation:tfxPatrolBig 20s ease-in-out infinite}
 .tfx-mascot.patrolsmall{animation:tfxPatrolSmall 11s ease-in-out infinite}
+@keyframes tfxTwinkle{0%,100%{opacity:.15}50%{opacity:1}}
+.tfx-page-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.tfx-page-bg .sky{position:absolute;top:0;left:0;right:0;height:62vh}
+.tfx-page-bg .ground{position:absolute;bottom:0;left:0;right:0;height:38vh}
+.tfx-page-bg .star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:tfxTwinkle 2.6s ease-in-out infinite}
+.tfx-page-bg .bgmascot{position:absolute;bottom:0;filter:drop-shadow(0 8px 10px rgba(0,0,0,.25));animation:tfxBob 4.5s ease-in-out infinite}
+.tfx-page-bg .bgmascot.sway{animation:tfxSway 4.5s ease-in-out infinite}
+.tfx-page-bg .bgmascot.still{animation:none}
 `;
 function ThemeFxStyle() {
   return <style>{THEME_FX_CSS}</style>;
@@ -244,6 +289,35 @@ function HeaderFx({ theme }) {
       })}
       <div ref={ref} className="tfx-particles" />
     </>
+  );
+}
+// พื้นหลังทั้งหน้าแบบ "ฉากไดโอรามา" — ท้องฟ้า/พื้น + มาสคอตตัวใหญ่กระจายอยู่ (เห็นเป็นพื้นหลังรอบๆ การ์ดเนื้อหา)
+// วิธีลบ: ลบ <PageBg .../> ที่เรียกใช้ และลบฟังก์ชันนี้กับ CSS ส่วน tfx-page-bg ออกจาก THEME_FX_CSS
+function PageBg({ theme }) {
+  const stars = React.useMemo(() => {
+    if (theme.mode !== "night") return [];
+    return Array.from({ length: 28 }, () => ({
+      left: Math.random() * 100, top: Math.random() * 55, delay: Math.random() * 2.6,
+    }));
+  }, [theme]);
+  return (
+    <div className="tfx-page-bg" aria-hidden="true">
+      <div className="sky" style={{ background: theme.sky }}>
+        {stars.map((s, i) => (
+          <span key={i} className="star" style={{ left: s.left + "%", top: s.top + "%", animationDelay: s.delay + "s" }} />
+        ))}
+      </div>
+      <div className="ground" style={{ background: theme.ground }} />
+      {(theme.bgScene || []).map((item, i) => {
+        const cls = { sway: "sway", still: "still" }[item.anim] || "";
+        return (
+          <div key={i} className={"bgmascot" + (cls ? " " + cls : "")}
+            style={{ left: item.left + "%", bottom: item.bottom + "%", fontSize: item.size, animationDelay: item.delay ? item.delay + "s" : undefined }}>
+            {item.e}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1930,19 +2004,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full" style={{ background: C.paper, fontFamily: "'Inter', sans-serif", position: "relative" }}>
-      {themeKey !== "default" && (
-        <div aria-hidden="true" style={{
-          position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden",
-          background: `radial-gradient(circle at 8% 15%, ${theme.headerBg}26, transparent 40%), radial-gradient(circle at 92% 25%, ${theme.accent}22, transparent 42%), radial-gradient(circle at 15% 85%, ${theme.accent}1f, transparent 45%), radial-gradient(circle at 90% 90%, ${theme.headerBg}22, transparent 42%)`,
-        }}>
-          {(theme.scene || []).slice(0, 3).map((item, i) => (
-            <span key={i} style={{
-              position: "absolute", left: `${(item.left + i * 23) % 92}%`, top: `${12 + i * 30}%`,
-              fontSize: (item.size || 40) * 1.8, opacity: 0.1, transform: `rotate(${i % 2 ? -10 : 10}deg)`,
-            }}>{item.e}</span>
-          ))}
-        </div>
-      )}
+      {themeKey !== "default" && <PageBg theme={theme} />}
       <div className="sticky top-0 z-10 flex items-center justify-between px-5 md:px-8 py-3 tfx-header" style={{ background: theme.headerBg, position: "relative" }}>
         <ThemeFxStyle />
         <HeaderFx theme={theme} />
