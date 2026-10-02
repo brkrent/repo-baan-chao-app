@@ -1928,13 +1928,22 @@ export default function App() {
   const theme = getTheme(property);
   const themeKey = resolveThemeKey(property);
 
-  const themedBg = themeKey !== "default"
-    ? `linear-gradient(180deg, ${theme.headerBg}33 0px, ${theme.headerBg}14 220px, ${C.paper} 460px, ${C.paper} 100%)`
-    : C.paper;
-
   return (
-    <div className="min-h-screen w-full" style={{ background: themedBg, fontFamily: "'Inter', sans-serif" }}>
-      <div className="sticky top-0 z-10 flex items-center justify-between px-5 md:px-8 py-3 tfx-header" style={{ background: theme.headerBg }}>
+    <div className="min-h-screen w-full" style={{ background: C.paper, fontFamily: "'Inter', sans-serif", position: "relative" }}>
+      {themeKey !== "default" && (
+        <div aria-hidden="true" style={{
+          position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden",
+          background: `radial-gradient(circle at 8% 15%, ${theme.headerBg}26, transparent 40%), radial-gradient(circle at 92% 25%, ${theme.accent}22, transparent 42%), radial-gradient(circle at 15% 85%, ${theme.accent}1f, transparent 45%), radial-gradient(circle at 90% 90%, ${theme.headerBg}22, transparent 42%)`,
+        }}>
+          {(theme.scene || []).slice(0, 3).map((item, i) => (
+            <span key={i} style={{
+              position: "absolute", left: `${(item.left + i * 23) % 92}%`, top: `${12 + i * 30}%`,
+              fontSize: (item.size || 40) * 1.8, opacity: 0.1, transform: `rotate(${i % 2 ? -10 : 10}deg)`,
+            }}>{item.e}</span>
+          ))}
+        </div>
+      )}
+      <div className="sticky top-0 z-10 flex items-center justify-between px-5 md:px-8 py-3 tfx-header" style={{ background: theme.headerBg, position: "relative" }}>
         <ThemeFxStyle />
         <HeaderFx theme={theme} />
         <div className="flex items-center gap-2 text-white" style={{ position: "relative", zIndex: 2 }}>
@@ -1952,45 +1961,40 @@ export default function App() {
       </div>
 
       {theme && themeKey !== "default" && theme.fact && (
-        <div className="tfx-header px-5 md:px-8 pt-8 pb-4 md:pt-9 md:pb-5" style={{ background: `linear-gradient(135deg, ${theme.headerBg}, ${theme.accent})` }}>
-          <ThemeFxStyle />
-          <HeaderFx theme={theme} />
-          <div style={{ position: "relative", zIndex: 2, textAlign: "center", fontSize: 44, lineHeight: 1, marginBottom: 10, filter: "drop-shadow(0 6px 10px rgba(0,0,0,.25))" }}>
-            {theme.emoji}
-          </div>
-          <div className="mx-auto" style={{ position: "relative", zIndex: 2, maxWidth: 520, background: "rgba(255,255,255,0.94)", borderRadius: 14, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 9, fontSize: 12.5, lineHeight: 1.6, color: C.ink, boxShadow: "0 8px 20px -8px rgba(0,0,0,.35)" }}>
-            <span style={{ fontSize: 15, lineHeight: 1 }}>💡</span>
-            <span><b>รู้หรือไม่?</b> {theme.fact}</span>
-          </div>
+        <div className="px-5 md:px-8 py-2.5 text-xs flex items-start gap-2" style={{ position: "relative", zIndex: 1, background: C.card, borderBottom: `1px solid ${C.line}`, color: C.inkSoft, borderLeft: `3px solid ${theme.accent}` }}>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>💡</span>
+          <span><b style={{ color: C.ink }}>รู้หรือไม่?</b> {theme.fact}</span>
         </div>
       )}
 
-      <div className="flex justify-center gap-2 py-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}` }}>
-        <button onClick={() => setView("bills")} className="px-4 py-1.5 rounded-full text-xs font-semibold" style={{ background: view === "bills" ? theme.accent : C.paper, color: view === "bills" ? "#fff" : C.inkSoft }}>บิล</button>
-        <button onClick={() => setView("shop")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "shop" ? theme.accent : C.paper, color: view === "shop" ? "#fff" : C.inkSoft }}><ShoppingCart size={13} /> ร้านค้า</button>
-        {profile.role === "tenant" && (
-          <button onClick={() => setView("profile")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "profile" ? theme.accent : C.paper, color: view === "profile" ? "#fff" : C.inkSoft }}><User size={13} /> โปรไฟล์</button>
-        )}
-        <button onClick={() => setView("rules")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "rules" ? theme.accent : C.paper, color: view === "rules" ? "#fff" : C.inkSoft }}><FileText size={13} /> กฎการเช่า</button>
-      </div>
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div className="flex justify-center gap-2 py-2" style={{ background: C.card, borderBottom: `1px solid ${C.line}` }}>
+          <button onClick={() => setView("bills")} className="px-4 py-1.5 rounded-full text-xs font-semibold" style={{ background: view === "bills" ? theme.accent : C.paper, color: view === "bills" ? "#fff" : C.inkSoft }}>บิล</button>
+          <button onClick={() => setView("shop")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "shop" ? theme.accent : C.paper, color: view === "shop" ? "#fff" : C.inkSoft }}><ShoppingCart size={13} /> ร้านค้า</button>
+          {profile.role === "tenant" && (
+            <button onClick={() => setView("profile")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "profile" ? theme.accent : C.paper, color: view === "profile" ? "#fff" : C.inkSoft }}><User size={13} /> โปรไฟล์</button>
+          )}
+          <button onClick={() => setView("rules")} className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1" style={{ background: view === "rules" ? theme.accent : C.paper, color: view === "rules" ? "#fff" : C.inkSoft }}><FileText size={13} /> กฎการเช่า</button>
+        </div>
 
-      {view === "bills" ? (
-        profile.role === "landlord" ? (
-          <LandlordView rooms={rooms} cyclesByRoom={cyclesByRoom} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+        {view === "bills" ? (
+          profile.role === "landlord" ? (
+            <LandlordView rooms={rooms} cyclesByRoom={cyclesByRoom} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+          ) : (
+            <TenantView room={myRoom} cycle={myCycle} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
+          )
+        ) : view === "shop" ? (
+          profile.role === "landlord" ? (
+            <ShopLandlordView />
+          ) : (
+            <ShopTenantView room={myRoom} property={property} />
+          )
+        ) : view === "rules" ? (
+          <RulesView property={property} role={profile.role} onRefresh={() => loadData(session.user.id)} />
         ) : (
-          <TenantView room={myRoom} cycle={myCycle} rates={rates} property={property} onRefresh={() => loadData(session.user.id)} />
-        )
-      ) : view === "shop" ? (
-        profile.role === "landlord" ? (
-          <ShopLandlordView />
-        ) : (
-          <ShopTenantView room={myRoom} property={property} />
-        )
-      ) : view === "rules" ? (
-        <RulesView property={property} role={profile.role} onRefresh={() => loadData(session.user.id)} />
-      ) : (
-        <ProfileTenantView profile={profile} onRefresh={() => loadData(session.user.id)} />
-      )}
+          <ProfileTenantView profile={profile} onRefresh={() => loadData(session.user.id)} />
+        )}
+      </div>
     </div>
   );
 }
