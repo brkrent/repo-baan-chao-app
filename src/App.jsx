@@ -331,22 +331,57 @@ function currentCycleLabel() {
   const d = new Date();
   return `${MONTHS_TH[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
+// ---------- กติกาค่าปรับชำระล่าช้า (แก้ตัวเลขตรงนี้ที่เดียวได้เลย) ----------
+const LATE_GRACE_DAYS = 3;       // ผ่อนผันให้ชำระช้าได้ 3 วันหลังวันครบกำหนด โดยไม่มีค่าปรับ
+const LATE_FEE_PER_DAY = 200;    // เลยจากนั้น คิดค่าปรับวันละ 200 บาท
+const LATE_FEE_MAX_DAYS = 30;    // คิดค่าปรับสูงสุด 1 เดือน (30 วัน = 6,000 บาท)
+const LATE_FEE_EFFECTIVE_DATE = "2026-10-21"; // บิลที่ชำระเสร็จก่อนวันนี้ จะไม่ถูกคิดค่าปรับย้อนหลัง
+
+// วันที่แบบเวลาท้องถิ่น (ตัดเวลาทิ้ง) — ใช้เทียบจำนวนวันให้ตรงกับปฏิทินจริงของผู้ใช้
+function localDay(input) {
+  const d = typeof input === "string" && input.length === 10 ? new Date(input + "T00:00:00") : new Date(input);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function toLocalISODate(d) {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function addDaysStr(dateStr, n) {
+  const d = localDay(dateStr);
+  d.setDate(d.getDate() + n);
+  return toLocalISODate(d);
+}
+// ค่าปรับ: นับจากวันครบกำหนด → ผ่อนผัน 3 วัน → วันที่ 4 เป็นต้นไปวันละ 200 บาท สูงสุด 30 วัน
+// หยุดนับเมื่อผู้เช่ากด "แจ้งโอนแล้ว" (หรือเมื่อเจ้าของบ้านบันทึกรับเงินสด) ไม่ให้ผู้เช่าโดนปรับเพิ่มเพราะรอเจ้าของบ้านยืนยัน
+function calcLateFee(cycle) {
+  const none = { daysLate: 0, feeDays: 0, fee: 0, graceUntil: null, capped: false };
+  if (!cycle || !cycle.due_date) return none;
+  if (cycle.status === "awaiting_reading") return none;
+  if (cycle.status === "paid" && cycle.paid_at && localDay(cycle.paid_at) < localDay(LATE_FEE_EFFECTIVE_DATE)) return none;
+  const stopAt = cycle.transferred_at || cycle.paid_at || new Date();
+  const daysLate = Math.max(0, Math.round((localDay(stopAt) - localDay(cycle.due_date)) / 86400000));
+  const rawFeeDays = Math.max(0, daysLate - LATE_GRACE_DAYS);
+  const feeDays = Math.min(rawFeeDays, LATE_FEE_MAX_DAYS);
+  return { daysLate, feeDays, fee: feeDays * LATE_FEE_PER_DAY, graceUntil: addDaysStr(cycle.due_date, LATE_GRACE_DAYS), capped: rawFeeDays > LATE_FEE_MAX_DAYS };
+}
 function calcCycleBill(cycle) {
   if (!cycle) return null;
   const waterUnits = Math.max(0, (cycle.curr_water ?? cycle.prev_water) - cycle.prev_water);
   const electricUnits = Math.max(0, (cycle.curr_electric ?? cycle.prev_electric) - cycle.prev_electric);
   const waterCost = waterUnits * cycle.water_rate;
   const electricCost = electricUnits * cycle.electric_rate;
-  return { waterUnits, electricUnits, waterCost, electricCost, total: Number(cycle.rent) + waterCost + electricCost };
+  const late = calcLateFee(cycle);
+  return { waterUnits, electricUnits, waterCost, electricCost, late, lateFee: late.fee, total: Number(cycle.rent) + waterCost + electricCost + late.fee };
 }
 function daysSince(dateStr) {
   if (!dateStr) return 0;
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+  return Math.round((localDay(new Date()) - localDay(dateStr)) / 86400000);
 }
 function defaultDueDate() {
   const d = new Date();
   d.setDate(d.getDate() + 7);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 // เลื่อนวันครบกำหนดชำระไปข้างหน้า 1 เดือนเสมอ (ไม่อิงวันที่จ่ายจริง)
 // เช่น ครบกำหนด 1 ต.ค. รอบถัดไปจะเป็น 1 พ.ย. แม้ผู้เช่าจะจ่ายช้าหรือเร็วกว่านั้นก็ตาม
@@ -355,7 +390,7 @@ function addOneMonth(dateStr) {
   const originalDay = d.getDate();
   d.setMonth(d.getMonth() + 1);
   if (d.getDate() !== originalDay) d.setDate(0); // เดือนสั้นกว่า (เช่น ก.พ.) ให้ใช้วันสุดท้ายของเดือนนั้น
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 function nextDueDate(prevDueDate) {
   return prevDueDate ? addOneMonth(prevDueDate) : defaultDueDate();
@@ -619,6 +654,7 @@ function ReceiptModal({ cycle, room, property, onClose }) {
           <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
           <Row label={`ค่าน้ำ (${b.waterUnits} หน่วย)`} value={`฿${baht(b.waterCost)}`} />
           <Row label={`ค่าไฟ (${b.electricUnits} หน่วย)`} value={`฿${baht(b.electricCost)}`} />
+          <LateFeeRow bill={b} />
           <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: `1px dashed ${C.line}` }}>
             <span className="font-semibold" style={{ color: C.navy }}>ยอดรวมที่ชำระ</span>
             <span className="text-xl font-bold" style={mono}>฿{baht(b.total)}</span>
@@ -744,14 +780,33 @@ function Spinner({ label }) {
 }
 function DueDateRow({ cycle }) {
   if (!cycle.due_date) return null;
+  const isPaid = cycle.status === "paid";
   const overdueDays = daysSince(cycle.due_date);
-  const isOverdue = overdueDays > 0;
+  const isOverdue = !isPaid && overdueDays > 0;
+  const late = calcLateFee(cycle);
   return (
-    <div className="flex items-center justify-between text-xs mb-2 rounded-lg px-2 py-1.5" style={{ background: isOverdue ? C.alertSoft : C.successSoft }}>
-      <span style={{ color: C.inkSoft }}>วันครบกำหนดชำระ</span>
-      <span className="font-semibold" style={{ color: isOverdue ? C.alert : C.success }}>
-        {formatThaiDate(cycle.due_date)}{isOverdue ? ` (เลยกำหนด ${overdueDays} วัน)` : ""}
-      </span>
+    <div className="mb-2 rounded-lg px-2 py-1.5 text-xs" style={{ background: isOverdue ? C.alertSoft : C.successSoft }}>
+      <div className="flex items-center justify-between">
+        <span style={{ color: C.inkSoft }}>วันครบกำหนดชำระ</span>
+        <span className="font-semibold" style={{ color: isOverdue ? C.alert : C.success }}>
+          {formatThaiDate(cycle.due_date)}{isOverdue ? ` (เลยกำหนด ${overdueDays} วัน)` : ""}
+        </span>
+      </div>
+      {!isPaid && (
+        <div className="mt-1 text-[10px] leading-snug" style={{ color: C.inkSoft }}>
+          ผ่อนผันได้ถึงวันที่ {formatThaiDate(late.graceUntil)} · หลังจากนั้นค่าปรับวันละ ฿{baht(LATE_FEE_PER_DAY)} (สูงสุด {LATE_FEE_MAX_DAYS} วัน)
+        </div>
+      )}
+    </div>
+  );
+}
+// แถวค่าปรับ — แสดงเฉพาะเมื่อมีค่าปรับจริง
+function LateFeeRow({ bill }) {
+  if (!bill || !bill.lateFee) return null;
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span style={{ color: C.alert }}>ค่าปรับชำระล่าช้า ({bill.late.feeDays} วัน × ฿{baht(LATE_FEE_PER_DAY)}{bill.late.capped ? " · ครบสูงสุดแล้ว" : ""})</span>
+      <span className="font-semibold" style={{ color: C.alert, ...mono }}>฿{baht(bill.lateFee)}</span>
     </div>
   );
 }
@@ -768,9 +823,14 @@ function DueDateBadge({ dueDate }) {
 function OverdueBanner({ cycle }) {
   const days = cycle.due_date ? daysSince(cycle.due_date) : daysSince(cycle.submitted_at) - 3;
   if (days < 1) return null;
+  const late = calcLateFee(cycle);
+  const feeText = !cycle.due_date ? "" : late.fee > 0
+    ? ` · ค่าปรับสะสม ฿${baht(late.fee)} (วันละ ฿${baht(LATE_FEE_PER_DAY)})`
+    : ` · ยังอยู่ในช่วงผ่อนผัน ปลอดค่าปรับถึงวันที่ ${formatThaiDate(late.graceUntil)}`;
   return (
-    <div className="rounded-xl p-3 mb-4 flex items-center gap-2 text-sm font-medium" style={{ background: C.alertSoft, color: C.alert }}>
-      <History size={16} /> {cycle.due_date ? `เลยกำหนดชำระมาแล้ว ${days} วัน (ครบกำหนด ${formatThaiDate(cycle.due_date)})` : `ค้างชำระมาแล้ว ${days + 3} วัน`} กรุณาชำระโดยเร็ว
+    <div className="rounded-xl p-3 mb-4 flex items-start gap-2 text-sm font-medium" style={{ background: C.alertSoft, color: C.alert }}>
+      <History size={16} className="mt-0.5 shrink-0" />
+      <span>{cycle.due_date ? `เลยกำหนดชำระมาแล้ว ${days} วัน (ครบกำหนด ${formatThaiDate(cycle.due_date)})${feeText}` : `ค้างชำระมาแล้ว ${days + 3} วัน`} กรุณาชำระโดยเร็ว</span>
     </div>
   );
 }
@@ -1300,6 +1360,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
                 <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
                 <Row label={`ค่าน้ำ (${bill.waterUnits} หน่วย)`} value={`฿${baht(bill.waterCost)}`} />
                 <Row label={`ค่าไฟ (${bill.electricUnits} หน่วย)`} value={`฿${baht(bill.electricCost)}`} />
+                <LateFeeRow bill={bill} />
                 <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: `1px solid ${C.line}` }}>
                   <span className="font-semibold" style={{ color: C.navy }}>ยอดรวม</span>
                   <span className="text-xl font-bold" style={mono}>฿{baht(bill.total)}</span>
@@ -1376,7 +1437,9 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 
   const notifyTransferred = async () => {
     setProcessing(true);
-    await supabase.from("billing_cycles").update({ status: "awaiting_confirmation" }).eq("id", cycle.id);
+    // บันทึกเวลาที่แจ้งโอน เพื่อหยุดนับค่าปรับ (ต้องรัน SQL addon-12 ก่อน ถ้ายังไม่ได้รันจะข้ามส่วนนี้ไปโดยไม่ทำให้แจ้งโอนพัง)
+    const { error } = await supabase.from("billing_cycles").update({ status: "awaiting_confirmation", transferred_at: new Date().toISOString() }).eq("id", cycle.id);
+    if (error) await supabase.from("billing_cycles").update({ status: "awaiting_confirmation" }).eq("id", cycle.id);
     setProcessing(false); onRefresh();
   };
 
@@ -1390,6 +1453,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
               <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>รอเจ้าของบ้านกรอกมิเตอร์</h2>
               <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอบบิล {cycle.cycle_label} — เจ้าของบ้านจะเป็นผู้บันทึกค่าน้ำและค่าไฟ เมื่อบันทึกเสร็จ บิลจะแสดงที่นี่ให้คุณชำระเงิน</p>
             </div>
+            <div className="text-left"><DueDateRow cycle={cycle} /></div>
             <HistoryPanel history={history} room={room} property={property} />
           </div>
         ) : !isMeterEntryAllowed(cycle) ? (
@@ -1442,6 +1506,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
               <Row label="ค่าเช่า" value={`฿${baht(cycle.rent)}`} />
               <Row label={`ค่าน้ำ (${bill.waterUnits} หน่วย)`} value={`฿${baht(bill.waterCost)}`} />
               <Row label={`ค่าไฟ (${bill.electricUnits} หน่วย)`} value={`฿${baht(bill.electricCost)}`} />
+              <LateFeeRow bill={bill} />
             </div>
             <div className="flex items-center justify-between pt-3 mt-3" style={{ borderTop: `1px solid ${C.line}` }}>
               <span className="font-semibold" style={{ color: C.navy }}>ยอดที่ต้องชำระ</span>
@@ -1478,6 +1543,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
             <QrCode size={32} color={C.alert} />
             <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>แจ้งโอนเงินแล้ว</h2>
             <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอเจ้าของบ้านตรวจสอบและยืนยันยอด ฿{baht(bill.total)}</p>
+            {bill.lateFee > 0 && <p className="text-xs mt-1" style={{ color: C.alert }}>รวมค่าปรับชำระล่าช้า ฿{baht(bill.lateFee)} แล้ว (หยุดนับตั้งแต่คุณแจ้งโอน)</p>}
           </div>
           <div className="rounded-2xl p-5 mt-4" style={{ background: C.card, border: `1px solid ${C.line}` }}><HistoryPanel history={history} room={room} property={property} /></div>
         </>
