@@ -354,9 +354,10 @@ function addDaysStr(dateStr, n) {
 }
 // ค่าปรับ: นับจากวันครบกำหนด → ผ่อนผัน 3 วัน → วันที่ 4 เป็นต้นไปวันละ 200 บาท สูงสุด 30 วัน
 // หยุดนับเมื่อผู้เช่ากด "แจ้งโอนแล้ว" (หรือเมื่อเจ้าของบ้านบันทึกรับเงินสด) ไม่ให้ผู้เช่าโดนปรับเพิ่มเพราะรอเจ้าของบ้านยืนยัน
-function calcLateFee(cycle) {
+function calcLateFee(cycle, room) {
   const none = { daysLate: 0, feeDays: 0, fee: 0, graceUntil: null, capped: false };
   if (!cycle || !cycle.due_date) return none;
+  if (room && room.late_fee_enabled === false) return none; // เจ้าของบ้านปิดค่าปรับของห้องนี้
   if (cycle.status === "awaiting_reading") return none;
   if (cycle.status === "paid" && cycle.paid_at && localDay(cycle.paid_at) < localDay(LATE_FEE_EFFECTIVE_DATE)) return none;
   const stopAt = cycle.transferred_at || cycle.paid_at || new Date();
@@ -365,13 +366,13 @@ function calcLateFee(cycle) {
   const feeDays = Math.min(rawFeeDays, LATE_FEE_MAX_DAYS);
   return { daysLate, feeDays, fee: feeDays * LATE_FEE_PER_DAY, graceUntil: addDaysStr(cycle.due_date, LATE_GRACE_DAYS), capped: rawFeeDays > LATE_FEE_MAX_DAYS };
 }
-function calcCycleBill(cycle) {
+function calcCycleBill(cycle, room) {
   if (!cycle) return null;
   const waterUnits = Math.max(0, (cycle.curr_water ?? cycle.prev_water) - cycle.prev_water);
   const electricUnits = Math.max(0, (cycle.curr_electric ?? cycle.prev_electric) - cycle.prev_electric);
   const waterCost = waterUnits * cycle.water_rate;
   const electricCost = electricUnits * cycle.electric_rate;
-  const late = calcLateFee(cycle);
+  const late = calcLateFee(cycle, room);
   return { waterUnits, electricUnits, waterCost, electricCost, late, lateFee: late.fee, total: Number(cycle.rent) + waterCost + electricCost + late.fee };
 }
 function daysSince(dateStr) {
@@ -614,7 +615,7 @@ function UsageBar({ icon: Icon, color, value, max, unit }) {
   );
 }
 function ReceiptModal({ cycle, room, property, onClose }) {
-  const b = calcCycleBill(cycle);
+  const b = calcCycleBill(cycle, room);
   const paidDate = cycle.paid_at
     ? new Date(cycle.paid_at).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })
     : "-";
@@ -725,7 +726,7 @@ function HistoryPanel({ history, room, property, allowDelete = false }) {
       ) : (
         <div className="space-y-3">
           {list.map((h) => {
-            const b = calcCycleBill(h);
+            const b = calcCycleBill(h, room);
             const checked = checkedIds.has(h.id);
             return (
               <div key={h.id} onClick={() => (selectMode ? toggleCheck(h.id) : setSelected(h))}
@@ -778,12 +779,13 @@ function Spinner({ label }) {
   return (<div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: C.inkSoft }}>
     <Loader2 size={22} className="animate-spin" /><span className="text-xs">{label}</span></div>);
 }
-function DueDateRow({ cycle }) {
+function DueDateRow({ cycle, room }) {
   if (!cycle.due_date) return null;
   const isPaid = cycle.status === "paid";
   const overdueDays = daysSince(cycle.due_date);
   const isOverdue = !isPaid && overdueDays > 0;
-  const late = calcLateFee(cycle);
+  const late = calcLateFee(cycle, room);
+  const feeOn = !(room && room.late_fee_enabled === false);
   return (
     <div className="mb-2 rounded-lg px-2 py-1.5 text-xs" style={{ background: isOverdue ? C.alertSoft : C.successSoft }}>
       <div className="flex items-center justify-between">
@@ -792,7 +794,7 @@ function DueDateRow({ cycle }) {
           {formatThaiDate(cycle.due_date)}{isOverdue ? ` (เลยกำหนด ${overdueDays} วัน)` : ""}
         </span>
       </div>
-      {!isPaid && (
+      {!isPaid && feeOn && (
         <div className="mt-1 text-[10px] leading-snug" style={{ color: C.inkSoft }}>
           ผ่อนผันได้ถึงวันที่ {formatThaiDate(late.graceUntil)} · หลังจากนั้นค่าปรับวันละ ฿{baht(LATE_FEE_PER_DAY)} (สูงสุด {LATE_FEE_MAX_DAYS} วัน)
         </div>
@@ -820,11 +822,12 @@ function DueDateBadge({ dueDate }) {
     </span>
   );
 }
-function OverdueBanner({ cycle }) {
+function OverdueBanner({ cycle, room }) {
   const days = cycle.due_date ? daysSince(cycle.due_date) : daysSince(cycle.submitted_at) - 3;
   if (days < 1) return null;
-  const late = calcLateFee(cycle);
-  const feeText = !cycle.due_date ? "" : late.fee > 0
+  const late = calcLateFee(cycle, room);
+  const feeOn = !(room && room.late_fee_enabled === false);
+  const feeText = !cycle.due_date || !feeOn ? "" : late.fee > 0
     ? ` · ค่าปรับสะสม ฿${baht(late.fee)} (วันละ ฿${baht(LATE_FEE_PER_DAY)})`
     : ` · ยังอยู่ในช่วงผ่อนผัน ปลอดค่าปรับถึงวันที่ ${formatThaiDate(late.graceUntil)}`;
   return (
@@ -926,10 +929,12 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
   const [editWaterPhoto, setEditWaterPhoto] = useState(null);
   const [editElectricPhoto, setEditElectricPhoto] = useState(null);
   const [meterMode, setMeterModeState] = useState(true);
+  const [lateFeeOn, setLateFeeOnState] = useState(true);
+  const [lateFeeError, setLateFeeError] = useState("");
 
   const room = rooms.find((r) => r.id === selectedId);
   const cycle = room ? cyclesByRoom[room.id] : null;
-  const bill = calcCycleBill(cycle);
+  const bill = calcCycleBill(cycle, room);
 
   const openRoom = async (r) => {
     setSelectedId(r.id);
@@ -947,6 +952,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     setEditElectric(rc ? (rc.curr_electric ?? rc.prev_electric) : 0);
     setEditWaterPhoto(null); setEditElectricPhoto(null);
     setMeterModeState(r.landlord_fills_meter !== false);
+    setLateFeeOnState(r.late_fee_enabled !== false); setLateFeeError("");
     const { data } = await supabase.from("billing_cycles").select("*").eq("room_id", r.id).eq("status", "paid").order("created_at", { ascending: false });
     setHistory(data || []);
     if (r.tenant_id) {
@@ -1030,6 +1036,15 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
     await supabase.from("rooms").update({ landlord_fills_meter: landlordFills }).eq("id", room.id);
     setBusy(false); onRefresh();
   };
+  const setLateFeeEnabled = async (on) => {
+    if (!room) return;
+    setLateFeeError("");
+    setBusy(true);
+    const { error } = await supabase.from("rooms").update({ late_fee_enabled: on }).eq("id", room.id);
+    setBusy(false);
+    if (error) { setLateFeeError("บันทึกไม่สำเร็จ — ต้องรัน SQL addon-13 ใน Supabase ก่อน (" + error.message + ")"); return; }
+    setLateFeeOnState(on); onRefresh();
+  };
   const changeTenantPassword = async () => {
     setPasswordError(""); setPasswordMsg("");
     if (!passwordDraft || passwordDraft.length < 6) { setPasswordError("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"); return; }
@@ -1097,7 +1112,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {rooms.map((r) => {
           const c = cyclesByRoom[r.id];
-          const b = calcCycleBill(c);
+          const b = calcCycleBill(c, r);
           return (
             <button key={r.id} onClick={() => openRoom(r)} className="text-left rounded-2xl overflow-hidden flex flex-col gap-3 transition hover:-translate-y-0.5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
               {r.photo ? <img src={r.photo} alt={r.label} className="w-full h-28 object-cover" /> : (
@@ -1246,6 +1261,22 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
             </div>
 
             <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
+              <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><History size={12} /> ค่าปรับชำระล่าช้า (ห้องนี้)</label>
+              <p className="text-[11px] mt-0.5 mb-2" style={{ color: C.inkSoft }}>ผ่อนผัน {LATE_GRACE_DAYS} วัน แล้วคิดวันละ ฿{baht(LATE_FEE_PER_DAY)} สูงสุด {LATE_FEE_MAX_DAYS} วัน — ปิดไว้ถ้าห้องนี้ไม่ต้องการคิดค่าปรับ</p>
+              <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
+                <button onClick={() => setLateFeeEnabled(true)} disabled={busy}
+                  className="flex-1 py-2 text-xs font-semibold" style={{ background: lateFeeOn ? C.navy : "#fff", color: lateFeeOn ? "#fff" : C.inkSoft }}>
+                  เปิด คิดค่าปรับ
+                </button>
+                <button onClick={() => setLateFeeEnabled(false)} disabled={busy}
+                  className="flex-1 py-2 text-xs font-semibold" style={{ background: !lateFeeOn ? C.navy : "#fff", color: !lateFeeOn ? "#fff" : C.inkSoft }}>
+                  ปิด ไม่คิดค่าปรับ
+                </button>
+              </div>
+              {lateFeeError && <p className="text-xs mt-2" style={{ color: C.alert }}>{lateFeeError}</p>}
+            </div>
+
+            <div className="rounded-xl p-3 mb-4" style={{ background: C.paper }}>
               <label className="text-xs font-medium flex items-center gap-1" style={{ color: C.inkSoft }}><Lock size={12} /> ตั้งรหัสผ่านใหม่ให้ผู้เช่า</label>
               <div className="flex items-center gap-2 mt-1">
                 <input type="text" placeholder="อย่างน้อย 6 ตัวอักษร" value={passwordDraft} onChange={(e) => setPasswordDraft(e.target.value)} className="flex-1 px-3 py-2 rounded-xl text-sm outline-none" style={{ border: `1px solid ${C.line}`, background: "#fff", ...mono }} />
@@ -1297,7 +1328,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
               <div className="rounded-xl p-3" style={{ background: C.paper }}>
                 <p className="text-sm font-semibold mb-1" style={{ color: C.navy }}>กรอกมิเตอร์รอบนี้ — {cycle.cycle_label}</p>
                 <p className="text-xs mb-2" style={{ color: C.inkSoft }}>เลขมิเตอร์ครั้งก่อน — น้ำ {cycle.prev_water} · ไฟ {cycle.prev_electric}</p>
-                <DueDateRow cycle={cycle} />
+                <DueDateRow cycle={cycle} room={room} />
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <Gauge value={Math.max(0, waterReading - cycle.prev_water)} max={20} color={C.water} softColor={C.waterSoft} icon={Droplet} label="น้ำ (หน่วยที่ใช้)" unitLabel="หน่วย" />
                   <Gauge value={Math.max(0, electricReading - cycle.prev_electric)} max={150} color={C.electric} softColor={C.electricSoft} icon={Zap} label="ไฟ (หน่วยที่ใช้)" unitLabel="หน่วย" />
@@ -1320,7 +1351,7 @@ function LandlordView({ rooms, cyclesByRoom, rates, property, onRefresh }) {
               </div>
             ) : (
               <div className="space-y-2 text-sm">
-                <DueDateRow cycle={cycle} />
+                <DueDateRow cycle={cycle} room={room} />
                 {editingMeter ? (
                   <div className="rounded-xl p-3" style={{ background: C.paper }}>
                     <p className="text-xs font-semibold mb-2" style={{ color: C.inkSoft }}>แก้ไขเลขมิเตอร์ (เลขครั้งก่อน — น้ำ {cycle.prev_water} · ไฟ {cycle.prev_electric})</p>
@@ -1411,7 +1442,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
   }, [cycle?.id]);
 
   if (!room || !cycle) return <Spinner label="กำลังโหลดข้อมูลห้อง…" />;
-  const bill = calcCycleBill(cycle);
+  const bill = calcCycleBill(cycle, room);
   const landlordFills = room.landlord_fills_meter !== false;
 
   const submitReading = async () => {
@@ -1453,7 +1484,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
               <h2 className="font-bold mt-3" style={{ color: C.navy, ...display }}>รอเจ้าของบ้านกรอกมิเตอร์</h2>
               <p className="text-sm mt-1" style={{ color: C.inkSoft }}>รอบบิล {cycle.cycle_label} — เจ้าของบ้านจะเป็นผู้บันทึกค่าน้ำและค่าไฟ เมื่อบันทึกเสร็จ บิลจะแสดงที่นี่ให้คุณชำระเงิน</p>
             </div>
-            <div className="text-left"><DueDateRow cycle={cycle} /></div>
+            <div className="text-left"><DueDateRow cycle={cycle} room={room} /></div>
             <HistoryPanel history={history} room={room} property={property} />
           </div>
         ) : !isMeterEntryAllowed(cycle) ? (
@@ -1469,7 +1500,7 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
           <div className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.line}` }}>
             <h2 className="font-bold mb-1" style={{ color: C.navy, ...display }}>กรอกมิเตอร์รอบนี้ — {cycle.cycle_label}</h2>
             <p className="text-xs mb-2" style={{ color: C.inkSoft }}>เลขมิเตอร์ครั้งก่อน — น้ำ {cycle.prev_water} · ไฟ {cycle.prev_electric}</p>
-            <DueDateRow cycle={cycle} />
+            <DueDateRow cycle={cycle} room={room} />
             <div className="grid grid-cols-2 gap-3 mb-4">
               <Gauge value={Math.max(0, water - cycle.prev_water)} max={20} color={C.water} softColor={C.waterSoft} icon={Droplet} label="น้ำ (หน่วยที่ใช้)" unitLabel="หน่วย" />
               <Gauge value={Math.max(0, electric - cycle.prev_electric)} max={150} color={C.electric} softColor={C.electricSoft} icon={Zap} label="ไฟ (หน่วยที่ใช้)" unitLabel="หน่วย" />
@@ -1496,10 +1527,10 @@ function TenantView({ room, cycle, rates, property, onRefresh }) {
 
       {cycle.status === "awaiting_payment" && (
         <>
-          <OverdueBanner cycle={cycle} />
+          <OverdueBanner cycle={cycle} room={room} />
           <div className="rounded-2xl p-5 mb-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
             <h2 className="font-bold mb-3" style={{ color: C.navy, ...display }}>บิลรอบนี้ — {room.label} ({cycle.cycle_label})</h2>
-            <DueDateRow cycle={cycle} />
+            <DueDateRow cycle={cycle} room={room} />
             <MeterCompare cycle={cycle} />
             <MeterPhotos cycle={cycle} />
             <div className="space-y-2 text-sm">
@@ -1574,7 +1605,7 @@ async function rotateOldPhotos(roomId) {
 }
 
 async function closeCycleAndAdvance(cycle, room, rates, method) {
-  const bill = calcCycleBill(cycle);
+  const bill = calcCycleBill(cycle, room);
   await supabase.from("billing_cycles").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", cycle.id);
   await supabase.from("payments").insert({ billing_cycle_id: cycle.id, method, amount: bill.total, status: "succeeded" });
   await supabase.from("billing_cycles").insert({
